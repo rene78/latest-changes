@@ -261,7 +261,7 @@
     <tag k="name" v="The Secret Café"/>
     <tag k="opening_hours" v="Mo-Fr 09:00-18:00; Sa 10:00-18:00"/>
     <tag k="operator" v="Maria Arnaldos"/>
-    <tag k="start_date" v="2022-06-07"/>
+    <!-- <tag k="start_date" v="2022-06-07"/> -->
     <tag k="website" v="https://linktr.ee/thesecretcafe"/>
   </node>
 </new>
@@ -355,8 +355,10 @@
 <action type="delete">
 <old>
   <node id="1501" lat="47.65" lon="9.47" version="1" timestamp="2013-07-01T09:01:11Z" changeset="496" uid="42" user="foo">
-    <tag k="foo" v="bar_1501"/>
-    <tag k="foo_1501" v="bar"/>
+    <tag k="amenity" v="bar"/>
+    <tag k="name" v="foobar"/>
+    <tag k="description" v="Only a test"/>
+    <tag k="foo" v="bar"/>
   </node>
 </old>
 <new>

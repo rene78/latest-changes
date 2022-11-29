@@ -415,6 +415,98 @@ h2 select {
 
 /* #endregion */
 
+/* #region CSS RELATED TO FILTER CHANGESETS TOOLBAR */
+.highlight {
+  background-color: yellow;
+}
+
+.filter-container {
+  padding: 5px 5px;
+}
+
+#filter-red-checkbox {
+  display: none;
+}
+
+.filter-red-checkbox-label {
+  width: 41px;
+  height: 41px;
+  background-color: #72befb;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  border-radius: 6px;
+  position: absolute;
+  left: 12px;
+}
+
+.filter-red-color {
+  filter: grayscale(100%);
+}
+
+.filter-red-checkbox-label:hover .traffic-light-filter {
+  filter: none;
+}
+
+.filter-red-checkbox-label:hover {
+  background-color: #008dff;
+}
+
+.search-changesets-field-container {
+  position: relative;
+  left: 54px;
+  top: 0;
+  margin: 0;
+  width: fit-content;
+  color: #f3f0f0;
+}
+
+.filter-symbol {
+  position: absolute;
+  left: 8px;
+  top: 12px;
+  width: 16px;
+  height: 16px;
+}
+
+.search-changesets-field {
+  padding: 10px 12px 10px 40px;
+  background-color: #72befb;
+  color: inherit;
+  border-radius: 6px;
+  border: none;
+  font-size: 18px;
+  width: 171px;
+}
+
+::placeholder {
+  color: #cad9e7;
+  opacity: 1;
+}
+
+.search-changesets-field:hover {
+  background-color: #008dff;
+}
+
+.delete-filter-input {
+  position: absolute;
+  cursor: pointer;
+  left: 194px;
+  top: 11px;
+  fill: #f3f0f0;
+}
+
+.delete-filter-input:hover {
+  fill: red;
+}
+
+.delete-filter-input-symbol {
+  width: 16px;
+  height: 16px;
+}
+/* #endregion */
+
 /* #region CSS RELATED TO LEAFLET MAP LAYOUT */
 .map-container {
   position: relative;

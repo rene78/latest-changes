@@ -1,5 +1,5 @@
 //Instantiate map
-var map = L.map('map', {
+let map = L.map('map', {
     gestureHandling: activateGestureHandling(),
     contextmenu: true,
     contextmenuWidth: 150,
@@ -87,13 +87,23 @@ function toggleSidebar() {
     // console.log(bounds);
 }
 
-//Toggle display of sidebar on press of Spacebar
+//1. Toggle display of sidebar on press of Spacebar
+//2. On typing a letter or number: Focus on filter changeset input field and input first letter
 document.addEventListener("keyup", event => {
     // console.log(event.key);
+    const isLetter = (event.key >= 'a' && event.key <= 'z');
+    const isNumber = (event.key >= '0' && event.key <= '9');
     event.preventDefault(); //prevent default, i.e. "page down" for spacebar
     if (event.key == " ") {
         toggleSidebar();
-    };
+    } else if (isLetter || isNumber) {
+        let inputField = document.querySelector(".search-changesets-field");
+        //If the input field is empty AND doesn't have focus: Add focus and write typed letter in field.
+        if (!inputField.value && document.activeElement !== inputField) {
+            inputField.focus();
+            inputField.value = event.key;
+        }
+    }
 });
 
 //Open link to OSM when "RMB --> Open with..."
@@ -101,6 +111,7 @@ function openOSM(e) {
     const url = `https://www.openstreetmap.org/?mlat=${e.latlng.lat}&mlon=${e.latlng.lng}#map=${map.getZoom()}/${e.latlng.lat}/${e.latlng.lng}`;
     window.open(url, '_blank').focus();
 }
+
 //Open link to Google Maps when "RMB --> Open with..."
 function openGmaps(e) {
     const url = `https://maps.google.com/maps?q=loc:${e.latlng.lat},${e.latlng.lng}`;
@@ -118,6 +129,13 @@ if (resolutionFromLocalStorage) {
 } else {
     // else, i.e. no resolution saved in local storage: Default to 7 days
     daysToShow = 7;
+}
+
+//Calculate point in time from where to start analysis
+function calculateAnalysisStartTime() {
+    const analysisStartTime = (new Date(new Date() - 1000 * 60 * 60 * 24 * daysToShow)).toISOString();
+    // console.log(analysisStartTime);
+    return analysisStartTime;
 }
 
 //Update hash on map pan/zoom (functionality from leaflet-hash.js)
@@ -154,6 +172,22 @@ function updateMap() {
     }
 }
 
+//Return color depending on age of changeset. New: bright red, old: dark red/gray
+/*The datescale function expects a date that is between Now and 1 (or 3, 7, 30) days in the past.
+Depending on how close the date is to Now it returns a number closer to 1.
+Example: NOW is 2022-11-14, 14:30. The range is 7 days)
+const number = datescale1(new Date(2022,10,13) //number = 0.7705556*/
+function defineColor(date) {
+    const datescale = d3.time.scale()
+        .domain([new Date(calculateAnalysisStartTime()), new Date()])
+        .range([0, 1]);
+    /*The colint function interpolates between gray (value 0) and red (value 1)
+colint(0) equals gray (#777777)
+colint(1) equals red (#ff0000)*/
+    const colint = d3.interpolateRgb('#777', '#f00');
+    return colint(datescale(date))
+}
+
 //Toggle display of loading animation and appearance of download button
 function toggleWaitingScreen() {
     const loadingAnimation = document.querySelector("#loading-animation");
@@ -167,7 +201,6 @@ function toggleWaitingScreen() {
 
 //On page load: Check if map is zoomed in enough. If yes: Download OSM changeset data from overpass via XHR request
 const overpass_server = '//overpass-api.de/api/'; //'https://overpass.kumi.systems/api/';
-const vandalismCheckResult = {};
 const deletedElementsLimit = -3; //If 3 more elements or tags have been deleted than added, the traffic light will change to red
 let xhr;
 let layer = null;
@@ -176,13 +209,13 @@ let layer = null;
 const isMapZoomedInEnough = updateMap();
 if (isMapZoomedInEnough) run();
 
-//Start download of changeset data
+//Variable with infos for all downloaded changeset
+let changesets = {};
+
+//Start download of changeset data and initiate rendering of changesets list and GeoJSON data on map
 function run() {
-
-    let users = [];
-    let editors = [];
-
     d3.select('#map').classed('faded', true);//Map displayed greyish (Cannot go into "toggleWaitingScreen()" because we want to keep the map greyed out in case of unsuccessful overpass query)
+    document.querySelector(".filter-container").classList.add("hide");//Hide filter changesets toolbar until load of changesets has been completed successfully
     toggleWaitingScreen();
     if (xhr) xhr.abort();
     const bounds = map.getBounds();
@@ -190,13 +223,12 @@ function run() {
         bounds.getSouthWest().wrap().lng + ',' +
         bounds.getNorthEast().lat + ',' +
         bounds.getNorthEast().wrap().lng;
-    const pointInTimeToStartAnalysis = (new Date(new Date() - 1000 * 60 * 60 * 24 * daysToShow)).toISOString();
-    const overpass_query = '[adiff:"' + pointInTimeToStartAnalysis + '"][bbox:' + bbox + '][out:xml][timeout:22];way->.ways;(.ways>;node;);out meta;.ways out geom meta;';
+    const overpass_query = '[adiff:"' + calculateAnalysisStartTime() + '"][bbox:' + bbox + '][out:xml][timeout:22];way->.ways;(.ways>;node;);out meta;.ways out geom meta;';
     // console.log(overpass_server + 'interpreter?data=' + overpass_query);
 
     //Either do an API call to Overpass or use a locally saved xml file for debugging purposes
     const xmlDataLocation = overpass_server + 'interpreter?data=' + overpass_query; //API call to overpass
-    // const xmlDataLocation = "./examples/example.xml"; //To load example xml: Comment out line above and uncomment this line
+    // const xmlDataLocation = "./examples/example1.xml"; //To load example xml: Comment out line above and uncomment this line
 
     xhr = d3.xml(xmlDataLocation
     ).on("error", function (error) {
@@ -205,10 +237,10 @@ function run() {
     })
         .on('load', function (data) {
             // console.log(data);
-            vandalismChecker();//Create object with vandalism analysis for each downloaded changeset
             var newData = document.implementation.createDocument(null, 'osm');
             var oldData = document.implementation.createDocument(null, 'osm');
             var elements = data.querySelectorAll('action');
+            //Separate changed (new) and pre-change (old) OSM map data into respective xml objects
             for (var i = 0; i < elements.length; i++) {
                 var element = elements[i];
                 switch (element.getAttribute('type')) {
@@ -254,15 +286,23 @@ function run() {
                 feature.properties.__is_old__ = true;
             });
 
+            //Change app display from "loading" to "ready"
             d3.select('#map').classed('faded', false);
             toggleWaitingScreen();
+
+            //Display filter changesets toolbar
+            document.querySelector(".filter-container").classList.remove("hide");
+            //Remove content of "filter changeset input" and hide X (in case old text from a previous download is still there)
+            document.querySelector(".search-changesets-field").value = "";
+            document.querySelector(".delete-filter-input").classList.add("hide");
+            //Reset display of "filter-red-checkbox" (in case it has been checked on a previous download)
+            document.querySelector(".traffic-light-filter").classList.add("filter-red-color");
+            document.querySelector("#filter-red-checkbox").checked = false;
+
+            //Clear old GeoJSON data from map
             layer && map.removeLayer(layer);
 
-            var datescale = d3.time.scale()
-                .domain([new Date(pointInTimeToStartAnalysis), new Date()])
-                .range([0, 1]);
-            var colint = d3.interpolateRgb('#777', '#f00');
-
+            //Create new GeoJSON layer, fill it with features of downloaded OSM data and add it to the map
             layer = new L.GeoJSON({
                 type: 'FeatureCollection',
                 features: [].concat(oldGeojson.features).concat(newGeojson.features)
@@ -272,12 +312,11 @@ function run() {
                     return L.circleMarker(latlng, { radius: 8 });
                 },
                 onEachFeature: onEachFeature
-            })
-                .addTo(map);
+            }).addTo(map);
 
             function setStyle(f) {
                 return {
-                    color: colint(datescale(new Date(f.properties.meta.timestamp))),
+                    color: defineColor(new Date(f.properties.meta.timestamp)),
                     opacity: f.properties.__is_old__ === true ? 0.2 : 1,
                     weight: 3
                 }
@@ -299,58 +338,25 @@ function run() {
                 });
             }
 
-            var bytime = [];
-            var changesets = {};
-            let allFeatures = [];
-
+            changesets = {};//Empty the changesets object in case of a subsequent run
+            //var bytime = [];
+            //here the leaflet layers and metadata is written into "changesets" object, which then goes to "bytime" array.
             layer.eachLayer(function (l) {
                 if (!l.feature.properties.meta.changeset) return;
-                allFeatures.push(l); 
                 changesets[l.feature.properties.meta.changeset] = changesets[l.feature.properties.meta.changeset] || {
                     id: l.feature.properties.meta.changeset,
                     time: new Date(l.feature.properties.meta.timestamp),
                     user: l.feature.properties.meta.user,
                     comment: '',
-                    features: []
+                    deltaInNodesWays: 0,
+                    deltaInTags: 0,
+                    possibleVandalism: false,
+                    layers: []
                 };
-                changesets[l.feature.properties.meta.changeset].features.push(l);
-                users.push(l.feature.properties.meta.user);
+                changesets[l.feature.properties.meta.changeset].layers.push(l);
             });
 
-            let uniqueUsers = [...new Set(users)];
-            uniqueUsers = uniqueUsers.sort();
-            uniqueUsers.unshift("<All>");
-
-            let usersDropdown = d3.select("#users").on('change', function () {
-                layer.eachLayer(function (l) {
-                    map.removeLayer(l);
-                });
-                let selectedUser = d3.select("#users").selectAll("option")[0][this.selectedIndex].value;
-                bytime = [];
-                for (var k in changesets) {
-                    if (selectedUser == "<All>" || changesets[k].user == selectedUser)
-                        bytime.push(changesets[k]);
-                }
-                updateDivs();
-                allFeatures.forEach(function (l) {
-                    if (selectedUser == "<All>" || l.feature.properties.meta.user == selectedUser) {
-                        map.addLayer(l);
-                    }
-                });
-            });
-            var options = usersDropdown.selectAll("option")
-                .data(uniqueUsers)
-                .enter()
-                .append("option");
-            options.text(function(d) {
-                return d;
-            }).attr("value", function(d) {
-                return d;
-            });
-
-            for (var k in changesets) {
-                bytime.push(changesets[k]);
-            }
+            vandalismChecker();//Create object with vandalism analysis for each downloaded changeset
 
             layer.on('click', function (e) {
                 //Highlight clicked layer on map and in sidebar
@@ -377,10 +383,10 @@ function run() {
                     .openOn(map);
             });
 
-            //Vandalism Checker
-            //Simple sanity checker for all the downloaded changesets. It summarizes all elements and tags which have been added or deleted
-            //in the changeset. If the sum is below a certain treshold (currently -3) then a traffic light changes to red to alert the user
-            //of this changeset.
+            /*Vandalism Checker
+            Simple sanity checker for all the downloaded changesets. It summarizes all elements and tags which have been added or deleted
+            in the changeset. If the sum is below a certain treshold (currently -3) then a traffic light changes to red to alert the user
+            of this changeset.*/
             function vandalismChecker() {
                 let actions = data.querySelectorAll("action");
                 // console.log(actions);
@@ -395,18 +401,15 @@ function run() {
                     else changesetNumber = actions[i].lastElementChild.firstElementChild.getAttribute("changeset");
                     // console.log(changesetNumber);
 
-                    //Create empty changeset object, if new.
-                    if (!vandalismCheckResult[changesetNumber]) vandalismCheckResult[changesetNumber] = { deltaInNodesWays: 0, deltaInTags: 0, possibleVandalism: false };
-
                     //Check which action is performed
                     //"Create"
                     //deltaInNodesWays++
                     //deltaInTags += nTagsAdded
-                    if (type === "create") {
+                    if (type === "create" && changesets[changesetNumber]) {
                         //Check the amount of tags that have been added
                         const nTagsAdded = actions[i].lastElementChild.querySelectorAll("tag").length;
                         // console.log(nTagsAdded);
-                        vandalismCheckResult[changesetNumber].deltaInTags += nTagsAdded;
+                        changesets[changesetNumber].deltaInTags += nTagsAdded;
 
                         //If a node with 0 tags has been created: Do not add it to deltaInNodesWays
                         //(normally it is just a newly created node of an already existing way)
@@ -416,27 +419,27 @@ function run() {
                         // console.log(elementType);
 
                         if (elementType === "node" && nTagsAdded == 0) continue;
-                        else vandalismCheckResult[changesetNumber].deltaInNodesWays++;
+                        else changesets[changesetNumber].deltaInNodesWays++;
                     }
 
                     // "Modify"
                     //deltaInNodesWays = unchanged
                     //deltaInTags += nTagsNew - nTagsOld
-                    if (type === "modify") {
+                    if (type === "modify" && changesets[changesetNumber]) {
                         const nTagsNew = actions[i].lastElementChild.firstElementChild.querySelectorAll("tag").length;
                         const nTagsOld = actions[i].firstElementChild.firstElementChild.querySelectorAll("tag").length;
                         // console.log(nTagsNew);
                         // console.log(nTagsOld);
-                        vandalismCheckResult[changesetNumber].deltaInTags += (nTagsNew - nTagsOld);
+                        changesets[changesetNumber].deltaInTags += (nTagsNew - nTagsOld);
                     }
 
                     // "Delete"
                     //deltaInNodesWays--
                     //deltaInTags -= nTags
-                    if (type === "delete") {
+                    if (type === "delete" && changesets[changesetNumber]) {
                         const nTagsDeleted = actions[i].firstElementChild.querySelectorAll("tag").length;
                         // console.log(nTagsDeleted);
-                        vandalismCheckResult[changesetNumber].deltaInTags -= nTagsDeleted;
+                        changesets[changesetNumber].deltaInTags -= nTagsDeleted;
 
                         //If a node with 0 tags has been deleted: Do not subtract it from deltaInNodesWays
                         // (normally it is just a newly deleted node of an already existing way)
@@ -448,17 +451,15 @@ function run() {
                         const nTagsBeforeDeletion = actions[i].firstElementChild.firstElementChild.querySelectorAll("tag").length;
                         // console.log(nTagsBeforeDeletion);
                         if (elementType === "node" && nTagsBeforeDeletion == 0) continue;
-                        else vandalismCheckResult[changesetNumber].deltaInNodesWays--;
+                        else changesets[changesetNumber].deltaInNodesWays--;
                     }
                 }
-                for (const changeset in vandalismCheckResult) {
+                for (const changeset in changesets) {
                     // console.log(changeset);
-                    // console.log(vandalismCheckResult[changeset].deltaInNodesWays);
-                    if ((vandalismCheckResult[changeset].deltaInNodesWays < deletedElementsLimit) || (vandalismCheckResult[changeset].deltaInTags < deletedElementsLimit)) {
-                        vandalismCheckResult[changeset].possibleVandalism = true;
+                    if ((changesets[changeset].deltaInNodesWays < deletedElementsLimit) || (changesets[changeset].deltaInTags < deletedElementsLimit)) {
+                        changesets[changeset].possibleVandalism = true;
                     }
                 }
-                // console.log(vandalismCheckResult);
             }
 
             //Create tag comparison table
@@ -621,236 +622,324 @@ function run() {
                 }
             }
 
-            bytime.sort(function (a, b) {
-                return (+b.time) - (+a.time);
-            });
+            //Download changeset text and changeset comment count. Once done render changesets list on the left side
+            const changesetIds = [];
+            for (const key in changesets) {
+                changesetIds.push(key);
+            }
+            // console.log(changesetIds);
 
-            var results = d3.select('#results');
+            document.querySelector("#results").innerHTML = "";//Empty old results list (same happens in renderChangeSetsList() "allresults" later on, but because of the API call below the old list in a subsequent call would still be shown for a second while the new GeoJSON data has already been loaded --> confusing UX)
 
-            //Highlight clicked layer on map and in sidebar
-            function click(d) {
-                results
-                    .selectAll('div.result')
-                    .classed('active', function (_) {
-                        return _.id == (d.id || d.feature.feature.properties.meta.changeset);
-                    });
-                layer.eachLayer(function (l) {
-                    layer.resetStyle(l);
-                })
-                var id = d.id ? d.id : d.feature.feature.properties.meta.changeset;
-                layer.eachLayer(function (l) {
-                    if (l.feature.properties.meta.changeset == id) {
-                        l.setStyle({ color: '#008dff' });
+            const queue = d3.queue();
+            while (changesetIds.length > 0) {
+                queue.defer(d3.xml, 'https://www.openstreetmap.org/api/0.6/changesets?changesets=' + changesetIds.splice(0, 100).join(','));//limit queried changesets to 100
+            }
+            queue.awaitAll(function (error, xmls) {
+                if (error) return console.error(error);
+                // console.log(xmls);
+                xmls.forEach(function (xml) {
+                    const css = xml.getElementsByTagName('changeset');
+                    // console.log(css);
+                    for (let i = 0; i < css.length; i++) {
+                        const cid = css[i].getAttribute('id');
+                        changesets[cid].discussionCount = +css[i].getAttribute("comments_count");
+                        const tag = css[i].querySelector('tag[k="comment"]');
+                        if (tag)
+                            changesets[cid].comment = tag.getAttribute('v');
                     }
                 });
+                // console.log(changesets);
+                //Render changesets list on the left side
+                renderChangesetsList(changesets);
+            });
+        }).get();
+}
 
-                //Make sure that sidebar is displayed
-                sidebar.classList.remove("hide");
+//Render changesets list on the left side
+function renderChangesetsList(changesetsToDisplay) {
+    const bytime = [];
+    for (const k in changesetsToDisplay) {
+        bytime.push(changesetsToDisplay[k]);
+    }
+    //Sort newest to oldest changeset
+    bytime.sort(function (a, b) {
+        return (+b.time) - (+a.time);
+    });
+    //From here onwards the creation of the changesets section starts
+    const results = d3.select('#results').html("");
+    const allresults = results
+        .selectAll('div.result')
+        .data(bytime, function (d) {
+            return d.id;
+        })
+        .attr('class', 'result')
+        .style('color', function (l) {
+            return defineColor(l.time);
+        });
+    allresults.exit().remove();
+
+    const rl = allresults.enter()
+        .append('div')
+        .attr('class', 'result')
+        .attr('title', 'Changeset is highlighted on map')
+        .style('color', function (l) {
+            return defineColor(l.time);
+        });
+    // console.log(rl);
+    allresults.order();
+
+    rl.on('click', click);//Highlight changeset on click (desktop/mobile)
+    rl.on('mouseover', click);//Highlight changeset on mouseover (desktop)
+
+    //"Zoom to changeset" button
+    rl.append('div')
+        .classed('zoom', true)
+        .attr('title', 'Zoom to changeset')
+        //.html('&#x1F50E; ')//Unicode glyph for a loupe
+        .on('click', function (d) {
+            //Check each layer on the map. If it belongs to clicked changeset --> add it to a featureGroup
+            //(featureGroup needed because layers with points only don't have a getBounds function)
+            d3.event.preventDefault();
+            const id = d.id ? d.id : d.feature.feature.properties.meta.changeset;
+            const changesetLayers = L.featureGroup();
+            layer.eachLayer(function (l) {
+                if (l.feature.properties.meta.changeset == id) l.addTo(changesetLayers);
+            });
+            //Zoom and pan to featureGroup
+            map.fitBounds(changesetLayers.getBounds());
+            //On small screens (screen width < 601px) scroll all the way down, so that map is completely visible on screen
+            if (screen.width < 601) {
+                let mapContainer = document.querySelector(".map-container");//does not work with map container, thus used "window" in the next line
+                window.scrollTo({
+                    top: 2222,
+                    behavior: 'smooth'
+                });
             }
+        })
+        .append('svg')
+        .classed('loupe', true)
+        .append('use')
+        .attr('href', 'img/icons.svg#loupe');
 
-            updateDivs();
-
-            function updateDivs() {
-                var allresults = results
-                    .selectAll('div.result')
-                    .data(bytime, function (d) {
-                        return d.id;
-                    })
-                    .attr('class', 'result')
-                    .style('color', function (l) {
-                        return colint(datescale(l.time));
-                    });
-                allresults.exit().remove();
-
-                var rl = allresults.enter()
-                    .append('div')
-                    .attr('class', 'result')
-                    .attr('title', 'Changeset is highlighted on map')
-                    .style('color', function (l) {
-                        return colint(datescale(l.time));
-                    });
-                allresults.order();
-
-                rl.on('click', click);//Highlight changeset on click (desktop/mobile)
-                rl.on('mouseover', click);//Highlight changeset on mouseover (desktop)
-
-                //"Zoom to changeset" button
-                rl.append('div')
-                    .classed('zoom', true)
-                    .attr('title', 'Zoom to changeset')
-                    //.html('&#x1F50E; ')//Unicode glyph for a loupe
-                    .on('click', function (d) {
-                        //Check each layer on the map. If it belongs to clicked changeset --> add it to a featureGroup
-                        //(featureGroup needed because layers with points only don't have a getBounds function)
-                        d3.event.preventDefault();
-                        var id = d.id ? d.id : d.feature.feature.properties.meta.changeset;
-                        var changesetLayers = L.featureGroup();
-                        layer.eachLayer(function (l) {
-                            if (l.feature.properties.meta.changeset == id) l.addTo(changesetLayers);
-                        });
-                        //Zoom and pan to featureGroup
-                        map.fitBounds(changesetLayers.getBounds());
-                        //On small screens (screen width < 601px) scroll all the way down, so that map is completely visible on screen
-                        if (screen.width < 601) {
-                            let mapContainer = document.querySelector(".map-container");//does not work with map container, thus used "window" in the next line
-                            window.scrollTo({
-                                top: 2222,
-                                behavior: 'smooth'
-                            });
-                        }
-                    })
-                    .append('svg')
-                    .classed('loupe', true)
-                    .append('use')
-                    .attr('href', 'img/icons.svg#loupe');
-
-                //Vandalism Checker traffic light
-                let trafficLightContainer = rl.append("div")
-                    .classed("traffic-light-container", true)
-                    .attr('title', function (d) {
-                        const changesetNumber = d.id;
-                        const possibleVandalism = vandalismCheckResult[changesetNumber].possibleVandalism;
-                        const deltaInNodesWays = vandalismCheckResult[changesetNumber].deltaInNodesWays;
-                        const deltaInTags = vandalismCheckResult[changesetNumber].deltaInTags;
-                        let titleText;
-                        if (possibleVandalism) {
-                            titleText = `This changeset is potentially destructive!
+    //Vandalism Checker traffic light
+    let trafficLightContainer = rl.append("div")
+        .classed("traffic-light-container", true)
+        .attr('title', function (d) {
+            const changesetNumber = d.id;
+            const possibleVandalism = changesets[changesetNumber].possibleVandalism;
+            const deltaInNodesWays = changesets[changesetNumber].deltaInNodesWays;
+            const deltaInTags = changesets[changesetNumber].deltaInTags;
+            let titleText;
+            if (possibleVandalism) {
+                titleText = `This changeset is potentially destructive!
 Sum of all added/deleted nodes or ways: ${deltaInNodesWays}. ${deltaInNodesWays < deletedElementsLimit ? "This is suspicious!" : ""}
 Sum of all added/deleted tags: ${deltaInTags}. ${deltaInTags < deletedElementsLimit ? "This is suspicious!" : ""}
 
 Reminder: It is often NOT necessary to delete elements in OSM. For example a closed shop should be tagged as 'disused:shop'. One day a new shop might open at the same exact lot and the tags can be updated. The same is true for demolished buildings ('demolished:building')
 `
-                        } else {
-                            titleText = `This changeset looks good!
+            } else {
+                titleText = `This changeset looks good!
 Sum of all added/deleted nodes or ways: ${deltaInNodesWays}. ${deltaInNodesWays < deletedElementsLimit ? "This is suspicious!" : ""}
 Sum of all added/deleted tags: ${deltaInTags}. ${deltaInTags < deletedElementsLimit ? "This is suspicious!" : ""}`
-                        }
-                        return titleText;
-                    })
-                let trafficLight = trafficLightContainer.append("div")
-                    .classed("traffic-light", true)
-                trafficLight.append("span")
-                    .attr('class', function (d) {
-                        const changesetNumber = d.id;
-                        const possibleVandalism = vandalismCheckResult[changesetNumber].possibleVandalism;
-                        return (possibleVandalism ? "gray" : "green");
-                    });
-                trafficLight.append("span")
-                    .attr('class', function (d) {
-                        const changesetNumber = d.id;
-                        const possibleVandalism = vandalismCheckResult[changesetNumber].possibleVandalism;
-                        return (possibleVandalism ? "red" : "gray");
-                    });
-
-                //Text bubble span where symbol is inserted in case of comments for this changeset
-                rl.append('span')
-                    .classed('text-bubble', true);
-
-                //User name
-                rl.append('a').text(function (d) {
-                    return d.user;
-                })
-                    .attr('title', 'Go to OSM user page')
-                    .attr('target', '_blank')
-                    .attr('href', function (d) {
-                        return '//openstreetmap.org/user/' + d.user;
-                    });
-
-                //Timespan since changeset creation
-                rl.append('span')
-                    .attr('title', function (d) {
-                        return moment(d.time).format('MMM Do YYYY, h:mm:ss a');
-                    })
-                    .attr('class', 'date').text(function (d) {
-                        return moment(d.time).fromNow();
-                    });
-
-                //link to achavi (temporarily hidden. To be discussed, if needed or not)
-                // rl.append('span').text(' ');
-                // rl.append('a').attr('class', 'reveal').text('«achavi»')
-                //     .attr('target', '_blank')
-                //     .attr('title', 'Get details about this changeset on Achavi')
-                //     .attr('href', function (d) {
-                //         return 'https://overpass-api.de/achavi/?changeset=' + d.id;
-                //     });
-
-                //Changeset information
-                rl.append('div').attr('class', 'changeset');
-                var queue = d3.queue();
-                var changesetIds = rl.data()
-                    .map(function (d) { return d.id })
-                    .filter(function (changesetId) { return changesetId !== ''; });
-                while (changesetIds.length > 0) {
-                    queue.defer(d3.xml, 'https://www.openstreetmap.org/api/0.6/changesets?changesets=' + changesetIds.splice(0, 100).join(','));
-                }
-                queue.awaitAll(function (error, xmls) {
-                    if (error) return console.error(error);
-
-                    var changesets = {};
-                    xmls.forEach(function (xml) {
-                        var css = xml.getElementsByTagName('changeset');
-                        for (var i = 0; i < css.length; i++) {
-                            var cid = css[i].getAttribute('id');
-                            changesets[cid] = {
-                                discussionCount: +css[i].getAttribute("comments_count")
-                            };
-                            var tag = css[i].querySelector('tag[k="comment"]');
-                            if (tag)
-                                changesets[cid].comment = tag.getAttribute('v');
-                            tag = css[i].querySelector('tag[k="created_by"]');
-                            if (tag) {
-                                changesets[cid].created_by = tag.getAttribute('v');
-                                editors.push(changesets[cid].created_by);
-                            }
-                        }
-                    });
-
-                    // this is not working - probably due to a different context (updateDivs calling itself)
-                    // but the problem here is that we get the changeset details rather late
-                    
-                    // let uniqueEditors = [...new Set(editors)];
-                    // uniqueEditors = uniqueEditors.sort();
-                    // uniqueEditors.unshift("<All>");
-        
-                    // let editorsDropdown = d3.select("#editors").on('change', function () {
-                    //     let selectedEditor = d3.select("#editors").selectAll("option")[0][this.selectedIndex].value;
-                    //     bytime = [];
-                    //     for (var k in changesets) {
-                    //         if (selectedEditor == "<All>" || changesets[k].created_by == selectedEditor)
-                    //             bytime.push(changesets[k]);
-                    //     }
-                    //     updateDivs();
-                    // });
-                    // var options = editorsDropdown.selectAll("option")
-                    //     .data(uniqueEditors)
-                    //     .enter()
-                    //     .append("option");
-                    // options.text(function(d) {
-                    //     return d;
-                    // }).attr("value", function(d) {
-                    //     return d;
-                    // });
-                            
-                    rl.select('span.text-bubble').each(function (d) {
-                        if (changesets[d.id].discussionCount > 0) {
-                            // d3.select(this).html('&#128489; ');//Speech bubble glyphicon (doesn't work on Android, thus changed to SVG)
-                            d3.select(this).attr('title', `Changeset has ${changesets[d.id].discussionCount} comment${changesets[d.id].discussionCount !== 1 ? "s" : ""}`);
-                            d3.select(this).append('svg')
-                                .classed('text-bubble-svg', true)
-                                .append('use')
-                                .attr('href', 'img/icons.svg#speech-bubble');
-                        }
-                    });
-                    rl.select('div.changeset').each(function (d) {
-                        d3.select(this).html(
-                            '<a href="https://openstreetmap.org/browse/changeset/' + d.id + '" target="_blank" class="comment" title="Go to OSM changeset page">' +
-                            (changesets[d.id].comment || '<span class="no-comment">&mdash;</span>') +
-                            '</a>'
-                        );
-                    });
-                });
             }
-        }).get();
+            return titleText;
+        })
+    let trafficLight = trafficLightContainer.append("div")
+        .classed("traffic-light", true)
+    trafficLight.append("span")
+        .attr('class', function (d) {
+            const changesetNumber = d.id;
+            const possibleVandalism = changesets[changesetNumber].possibleVandalism;
+            return (possibleVandalism ? "gray" : "green");
+        });
+    trafficLight.append("span")
+        .attr('class', function (d) {
+            const changesetNumber = d.id;
+            const possibleVandalism = changesets[changesetNumber].possibleVandalism;
+            return (possibleVandalism ? "red" : "gray");
+        });
+
+    //Text bubble span where symbol is inserted in case of comments for this changeset
+    rl.append('span')
+        .classed('text-bubble', true);
+
+    //User name
+    rl.append('a').html(function (d) {
+        return d.user;
+    })
+        .attr('title', 'Go to OSM user page')
+        .attr('target', '_blank')
+        .attr('href', function (d) {
+            return '//openstreetmap.org/user/' + d.user;
+        });
+
+    //Timespan since changeset creation
+    rl.append('span')
+        .attr('title', function (d) {
+            return moment(d.time).format('MMM Do YYYY, h:mm:ss a');
+        })
+        .attr('class', 'date').text(function (d) {
+            return moment(d.time).fromNow();
+        });
+
+    //Changeset text and changeset comment count (were downloaded separately from OSM)
+    rl.append('div').attr('class', 'changeset');
+    rl.select('span.text-bubble').each(function (d) {
+        if (d.discussionCount > 0) {
+            // d3.select(this).html('&#128489; ');//Speech bubble glyphicon (doesn't work on Android, thus changed to SVG)
+            d3.select(this).attr('title', `Changeset has ${d.discussionCount} comment${d.discussionCount !== 1 ? "s" : ""}`);
+            d3.select(this).append('svg')
+                .classed('text-bubble-svg', true)
+                .append('use')
+                .attr('href', 'img/icons.svg#speech-bubble');
+        }
+    });
+
+    rl.select('div.changeset').each(function (d) {
+        d3.select(this).html(
+            '<a href="https://openstreetmap.org/browse/changeset/' + d.id + '" target="_blank" class="comment" title="Go to OSM changeset page">' +
+            (d.comment || '<span class="no-comment">&mdash;</span>') +
+            '</a>'
+        );
+    });
+}
+
+//Highlight clicked layer on map and in sidebar (happens when selecting element in sidebar or on map)
+function click(d) {
+    var results = d3.select('#results');
+    results
+        .selectAll('div.result')
+        .classed('active', function (_) {
+            return _.id == (d.id || d.feature.feature.properties.meta.changeset);
+        });
+    layer.eachLayer(function (l) {
+        layer.resetStyle(l);
+    })
+    var id = d.id ? d.id : d.feature.feature.properties.meta.changeset;
+    layer.eachLayer(function (l) {
+        if (l.feature.properties.meta.changeset == id) {
+            l.setStyle({ color: '#008dff' });//Highlighting color: blue
+        }
+    });
+
+    //Make sure that sidebar is displayed
+    sidebar.classList.remove("hide");
+}
+
+//Filter changesets and update changesets list and GeoJSON data on map
+function filterChangesets() {
+    let foundChangesets = {};
+    const searchTerm = document.querySelector(".search-changesets-field").value.toLowerCase();
+    // console.log(searchTerm);
+    const onlyRed = document.querySelector("#filter-red-checkbox").checked;//Is "onylRed" checkbox ticked?
+    // If searchTerm is empty -->
+    // If onlyRed tickbox is NOT ticked: Render the whole changeset object in list and on the map and quit this function
+    // If onlyRed tickbox IS ticked: Filter out all objects which look clean (i.e. likely no vandalism)
+    if (!searchTerm) {
+        let changesetToRender = {};
+        //if onlyRed is ticked --> filter out all changesets with "possibleVandalism=false"
+        if (onlyRed) {
+            let wholeChangesetWithOnlyRed = {};
+            for (const changesetId in changesets) {
+                if (changesets[changesetId].possibleVandalism) wholeChangesetWithOnlyRed[changesetId] = changesets[changesetId];
+            }
+            changesetToRender = wholeChangesetWithOnlyRed;
+        } else changesetToRender = changesets;
+
+        // console.table(changesetToRender);
+
+        renderChangesetsList(changesetToRender);//Render all changesets in list
+        displayGeoJson(changesetToRender);//Render map elements of all changesets
+        return;
+    }
+
+    for (const changesetId in changesets) {
+        // console.log(changesetId);
+
+        //Skip, if only changesets with "possibleVandalism" are supposed to be shown and this one has "possibleVandalism=false"
+        if (onlyRed && !changesets[changesetId].possibleVandalism) continue;
+
+        //1. Search within COMMENTS for search term
+        const commentToCheck = changesets[changesetId].comment;
+        // console.log(commentToCheck);
+        let modifiedComment = '';
+        let foundAt;
+        let start = 0;
+        let previousStart = 0;
+        let loopCounter = 0;
+
+        while (foundAt !== -1) {
+            //In case user deletes all input in search field
+            if (!searchTerm) break;
+
+            foundAt = commentToCheck.toLowerCase().indexOf(searchTerm, start);
+            modifiedComment += commentToCheck.slice((previousStart == 0 && loopCounter == 0) ? 0 : previousStart + searchTerm.length, (foundAt !== -1) ? foundAt : undefined);
+            if (foundAt !== -1) modifiedComment += `<span class='highlight'>${commentToCheck.slice(foundAt, foundAt + searchTerm.length)}</span>`;
+            // console.log(text.slice(foundAt, foundAt + searchTerm.length));
+            // console.log(modifiedComment);
+            // if (foundAt !== -1) findIndices.push(foundAt);
+            previousStart = foundAt;
+            start = foundAt + 1;
+            loopCounter++;
+        }
+        // console.log(modifiedComment);
+
+        //2. Search within USER NAME for search term
+        const userNameToCheck = changesets[changesetId].user;
+        let modifiedUserName = '';
+        start = 0;
+        previousStart = 0;
+        foundAt = 0;
+        loopCounter = 0;
+
+        while (foundAt !== -1) {
+            //In case user deletes all input in search field
+            if (!searchTerm) break;
+
+            foundAt = userNameToCheck.toLowerCase().indexOf(searchTerm, start);
+            modifiedUserName += userNameToCheck.slice((previousStart == 0 && loopCounter == 0) ? 0 : previousStart + searchTerm.length, (foundAt !== -1) ? foundAt : undefined);
+            if (foundAt !== -1) modifiedUserName += `<span class='highlight'>${userNameToCheck.slice(foundAt, foundAt + searchTerm.length)}</span>`;
+            // console.log(text.slice(foundAt, foundAt + searchTerm.length));
+            // console.log(modifiedComment);
+            // if (foundAt !== -1) findIndices.push(foundAt);
+            previousStart = foundAt;
+            start = foundAt + 1;
+            loopCounter++;
+        }
+        // console.log(modifiedUserName);
+
+        //Create entry in "foundChangesets" object if modified user name or comment is different than original one, i.e. it has <span> elements inside
+        if (modifiedComment !== commentToCheck || modifiedUserName !== userNameToCheck) {
+            foundChangesets[changesetId] = {
+                id: changesetId,
+                time: changesets[changesetId].time,
+                user: modifiedUserName,
+                comment: modifiedComment,
+                discussionCount: changesets[changesetId].discussionCount,
+                layers: changesets[changesetId].layers
+            }
+        }
+    }
+    // console.table(foundChangesets);
+    renderChangesetsList(foundChangesets);
+    displayGeoJson(foundChangesets);
+
+    //Filter GeoJSON on map
+    function displayGeoJson(changesets) {
+        //Remove old GeoJSON
+        layer.eachLayer(function (l) {
+            map.removeLayer(l);
+        });
+
+        //Add layers of filtered changesets back to the map
+        for (const changeset of Object.values(changesets)) {
+            // console.log(changesets.layers);
+            for (let i = 0; i < changeset.layers.length; i++) {
+                map.addLayer(changeset.layers[i]);
+            }
+        }
+    }
 }
 
 //Show a modal with a message
@@ -864,9 +953,17 @@ function message(type, text) {
     infobox.classList.add("show", type);
 }
 
+//Scroll to top when clicking on "Back-to-top" button
+function scrollToTop() {
+    sidebar.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+    });
+}
+
 //Check current zoom level of map and show info message, if zoomed out too far
 map.on('zoom', updateMap);
-//Update location in local storage
+//Update location in local storage when panning the map
 map.on('drag', function (e) {
     localStorage.setItem('location-hash', location.hash);
 });
@@ -895,6 +992,31 @@ d3.select('#resolution')
 //Start download on click of button
 document.querySelector("#download-changesets-button").addEventListener("click", run);
 
+//Once text is typed into the filter changeset input --> Start filterChangesets function
+document.querySelector(".search-changesets-field").addEventListener("input", () => {
+    //Only show X to remove content of filter input after at least one char has been entered
+    const searchTerm = document.querySelector(".search-changesets-field").value;
+    const deleteFilterInput = document.querySelector(".delete-filter-input");
+    if (searchTerm.length > 0) deleteFilterInput.classList.remove("hide");
+    else deleteFilterInput.classList.add("hide");
+
+    //Filter changesets
+    filterChangesets();
+});
+
+//Remove content of "filter changeset input" once X is clicked
+document.querySelector(".delete-filter-input").addEventListener("click", () => {
+    document.querySelector(".search-changesets-field").value = "";
+    filterChangesets();//Show all changesets
+    document.querySelector(".delete-filter-input").classList.add("hide");//Hide X again
+});
+
+//Only show changesets with red traffic light when clicking on the "filter red" checkbox
+document.querySelector("#filter-red-checkbox").addEventListener("click", (e) => {
+    document.querySelector(".traffic-light-filter").classList.toggle("filter-red-color");
+    filterChangesets();
+});
+
 //Display "Back-to-top" button if changesets in sidebar are overflowing and user scrolled down a bit
 sidebar.addEventListener("scroll", event => {
     let toTop = document.querySelector(".to-top");
@@ -902,11 +1024,3 @@ sidebar.addEventListener("scroll", event => {
     if (sidebar.scrollTop > 50) toTop.classList.remove("hide");//display to-top button
     else toTop.classList.add("hide");//hide to-top button
 });
-
-//Scroll to top when clicking on "Back-to-top" button
-function scrollToTop() {
-    sidebar.scrollTo({
-        top: 0,
-        behavior: 'smooth'
-    });
-}

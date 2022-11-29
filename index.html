@@ -72,7 +72,7 @@
     <div class='changesets col'>
       <div class="background">
         <div class="heading">
-          <a href="https://github.com/tyrasd/latest-changes" target="_blank" rel="noopener noreferrer"><img
+          <a href="https://github.com/rene78/latest-changes" target="_blank" rel="noopener noreferrer"><img
               src="./img/favicon.ico" id="clock" alt="Logo" title="Go to GitHub repository"></a>
           <h3>Explore latest changes on OpenStreetMap</h3>
           <select id="resolution">
@@ -81,12 +81,31 @@
             <option value="7" selected>Last 7 Days</option>
             <option value="30">Last 30 Days</option>
           </select>
-          <select id="users"></select>
-          <!-- <select id="editors"></select> -->
           <button id="download-changesets-button" title="Get recent changesets in this region">
-            <svg class="circular-arrow"><use href="img/icons.svg#circular-arrow"></use></svg>
+            <svg class="circular-arrow">
+              <use href="img/icons.svg#circular-arrow"></use>
+            </svg>
             <span id="download-changesets-button-text">Get Changesets</span>
           </button>
+          <div class="filter-container">
+            <input type="checkbox" id="filter-red-checkbox" name="filter-red">
+            <label for="filter-red-checkbox" class="filter-red-checkbox-label"
+              title="Only show changesets which are potentially destructive">
+              <div class="traffic-light traffic-light-filter filter-red-color"><span class="gray"></span><span
+                  class="red"></span></div>
+            </label>
+            <div class="search-changesets-field-container" title="Filter for user name and changeset comment">
+              <svg class="filter-symbol">
+                <use href="img/icons.svg#filter"></use>
+              </svg>
+              <input type="text" class="search-changesets-field" placeholder="Filter changesets">
+              <div class="delete-filter-input hide">
+                <svg class="delete-filter-input-symbol">
+                  <use href="img/icons.svg#x-symbol"></use>
+                </svg>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       <div id='results'>
