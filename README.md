@@ -6,7 +6,9 @@ Objects that have been modified (or created or deleted) during the last week (or
 
 Newer edits are displayed in more saturated colors than older modifications. Deleted objects as well as the "previous state" of modified map features are displayed semi-transparently. Intermediate states of objects that have been modified more than once in the selected time period are not shown. The site currently doesn't show OSM modifications of relation objects.
 
-This is based on an earlier prototype by [@lxbarth](https://github.com/lxbarth), see http://www.openstreetmap.org/user/lxbarth/diary/19185 for background.
+This fork is based on [https://github.com/rene78/latest-changes](https://github.com/rene78/latest-changes) and adds a (currently partial) extension to filter for changes of a selected user (see [https://github.com/tyrasd/latest-changes/issues/18](https://github.com/tyrasd/latest-changes/issues/18)).
+
+The fork is currently deployed on [https://www.xctrails.org/osm-latest-changes/](https://www.xctrails.org/osm-latest-changes/)
 
 ## Running
 
