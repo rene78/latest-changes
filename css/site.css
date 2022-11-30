@@ -647,6 +647,6 @@ td:nth-child(2) {
   vertical-align: top;
   width: 16px;
   height: 16px;
+  padding-left: 3px;
 }
-
 /* #endregion */
