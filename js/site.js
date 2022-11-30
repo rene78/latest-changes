@@ -228,8 +228,8 @@ function run() {
     // console.log(overpass_server + 'interpreter?data=' + overpass_query);
 
     //Either do an API call to Overpass or use a locally saved xml file for debugging purposes
-    // const xmlDataLocation = overpass_server + 'interpreter?data=' + overpass_query; //API call to overpass
-    const xmlDataLocation = "./examples/example1.xml"; //To load example xml: Comment out line above and uncomment this line
+    const xmlDataLocation = overpass_server + 'interpreter?data=' + overpass_query; //API call to overpass
+    // const xmlDataLocation = "./examples/example1.xml"; //To load example xml: Comment out line above and uncomment this line
 
     xhr = d3.xml(xmlDataLocation
     ).on("error", function (error) {
