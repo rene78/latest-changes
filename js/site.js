@@ -73,7 +73,8 @@ L.Control.toggleSidebarButton = L.Control.extend(
 let toggleSidebarButton = new L.Control.toggleSidebarButton();
 map.addControl(toggleSidebarButton);
 
-//Toggle sidebar class and update Leaflet map size
+/*Toggle sidebar class and update Leaflet map size
+(but quite useless because the download button is hidden anyway, thus cannot make use of the added map real estate to download changesets of a larger region)*/
 function toggleSidebar() {
     sidebar.classList.toggle("hide");
     // let size = map.getSize();
@@ -173,17 +174,17 @@ function updateMap() {
 }
 
 //Return color depending on age of changeset. New: bright red, old: dark red/gray
-/*The datescale function expects a date that is between Now and 1 (or 3, 7, 30) days in the past.
-Depending on how close the date is to Now it returns a number closer to 1.
-Example: NOW is 2022-11-14, 14:30. The range is 7 days)
-const number = datescale1(new Date(2022,10,13) //number = 0.7705556*/
 function defineColor(date) {
+    /*The datescale function expects a date that is between Now and 1 (or 3, 7, 30) days in the past.
+    Depending on how close the date is to Now it returns a number closer to 1.
+    Example: NOW is 2022-11-14, 14:30. The range is 7 days)
+    const number = datescale(new Date(2022,10,13) //number = 0.7705556*/
     const datescale = d3.time.scale()
         .domain([new Date(calculateAnalysisStartTime()), new Date()])
         .range([0, 1]);
     /*The colint function interpolates between gray (value 0) and red (value 1)
-colint(0) equals gray (#777777)
-colint(1) equals red (#ff0000)*/
+    colint(0) equals gray (#777777)
+    colint(1) equals red (#ff0000)*/
     const colint = d3.interpolateRgb('#777', '#f00');
     return colint(datescale(date))
 }
@@ -227,8 +228,8 @@ function run() {
     // console.log(overpass_server + 'interpreter?data=' + overpass_query);
 
     //Either do an API call to Overpass or use a locally saved xml file for debugging purposes
-    const xmlDataLocation = overpass_server + 'interpreter?data=' + overpass_query; //API call to overpass
-    // const xmlDataLocation = "./examples/example1.xml"; //To load example xml: Comment out line above and uncomment this line
+    // const xmlDataLocation = overpass_server + 'interpreter?data=' + overpass_query; //API call to overpass
+    const xmlDataLocation = "./examples/example1.xml"; //To load example xml: Comment out line above and uncomment this line
 
     xhr = d3.xml(xmlDataLocation
     ).on("error", function (error) {
@@ -472,8 +473,7 @@ function run() {
                     // console.log(action);
 
                     //Create header with element info
-                    let tableHtml = `<span class="${action} capitalize">${action}</span> ${node[0].nodeName} <a href="https://www.openstreetmap.org/${node[0].nodeName}/${node[0].getAttribute("id")}" target="_blank" rel="noopener noreferrer">${node[0].getAttribute("id")}</a>`;
-                    // document.querySelector("#element-info").innerHTML = elementInfoHtml;
+                    let tableHtml = `<span class="${action} capitalize">${action}</span> ${node[0].nodeName} <a href="https://www.openstreetmap.org/${node[0].nodeName}/${node[0].getAttribute("id")}" target="_blank" rel="noopener noreferrer">${node[0].getAttribute("id")}</a> <a href="http://osmlab.github.io/osm-deep-history/#/${node[0].nodeName}/${node[0].getAttribute("id")}" title="Get complete history of element in 'OSM Deep History'" target="_blank" rel="noopener noreferrer"><svg class="clock-with-circular-arrow-symbol"><use href="img/icons.svg#clock-with-circular-arrow"></use></svg></a>`;
 
                     //Variables
                     tableHtml += `<table class="table-container">`;
@@ -615,8 +615,10 @@ function run() {
                         </table>
                     `;
 
-                    //Create link to edit geometry in iD editor
-                    tableHtml += `<a href="https://www.openstreetmap.org/edit?${node[0].nodeName}=${node[0].getAttribute("id")}" target="_blank" rel="noopener noreferrer">Edit in iD</a>`;
+                    //Create link to edit geometry in iD editor (only if element has not been deleted - deleted elements cannot be edited)
+                    if (action !== "delete") {
+                        tableHtml += `<a href="https://www.openstreetmap.org/edit?${node[0].nodeName}=${node[0].getAttribute("id")}" target="_blank" rel="noopener noreferrer">Edit in iD</a>`;
+                    }
 
                     return tableHtml;
                 }

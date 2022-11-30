@@ -445,10 +445,6 @@ h2 select {
   filter: grayscale(100%);
 }
 
-.filter-red-checkbox-label:hover .traffic-light-filter {
-  filter: none;
-}
-
 .filter-red-checkbox-label:hover {
   background-color: #008dff;
 }
@@ -505,6 +501,7 @@ h2 select {
   width: 16px;
   height: 16px;
 }
+
 /* #endregion */
 
 /* #region CSS RELATED TO LEAFLET MAP LAYOUT */
@@ -644,6 +641,12 @@ td:nth-child(2) {
 
 .metatags {
   background-color: #e5e5e5;
+}
+
+.clock-with-circular-arrow-symbol {
+  vertical-align: top;
+  width: 16px;
+  height: 16px;
 }
 
 /* #endregion */
