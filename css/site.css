@@ -429,16 +429,14 @@ h2 select {
 }
 
 .filter-red-checkbox-label {
-  width: 41px;
-  height: 41px;
+  width: 42px;
+  height: 42px;
   background-color: #72befb;
-  display: flex;
+  display: inline-flex;
   justify-content: center;
   align-items: center;
   cursor: pointer;
   border-radius: 6px;
-  position: absolute;
-  left: 12px;
 }
 
 .filter-red-color {
@@ -450,30 +448,53 @@ h2 select {
 }
 
 .search-changesets-field-container {
-  position: relative;
-  left: 54px;
-  top: 0;
-  margin: 0;
-  width: fit-content;
+  position: absolute;
+  left: 60px;
   color: #f3f0f0;
+  display: inline-block;
 }
 
 .filter-symbol {
   position: absolute;
+  pointer-events: none;
   left: 8px;
   top: 12px;
   width: 16px;
   height: 16px;
 }
 
+.delete-filter-input {
+  position: absolute;
+  cursor: pointer;
+  left: 197px;
+  top: 11px;
+  fill: #f3f0f0;
+}
+
+.delete-filter-input:hover {
+  fill: red;
+}
+
+/* Make sure that the whole input field remains in the darker color when hovering of the x */
+.delete-filter-input:hover ~ .search-changesets-field {
+  background-color: #008dff;
+}
+
+.delete-filter-input-symbol {
+  width: 16px;
+  height: 16px;
+}
+
 .search-changesets-field {
-  padding: 10px 12px 10px 40px;
+  padding: 0 30px 0 33px;
   background-color: #72befb;
   color: inherit;
   border-radius: 6px;
   border: none;
   font-size: 18px;
-  width: 171px;
+  width: 159px;
+  height: 42px;
+  vertical-align: top;/*needed to keep the height of the element unchanged (https://stackoverflow.com/a/28157789/5263954)*/
 }
 
 ::placeholder {
@@ -484,24 +505,6 @@ h2 select {
 .search-changesets-field:hover {
   background-color: #008dff;
 }
-
-.delete-filter-input {
-  position: absolute;
-  cursor: pointer;
-  left: 194px;
-  top: 11px;
-  fill: #f3f0f0;
-}
-
-.delete-filter-input:hover {
-  fill: red;
-}
-
-.delete-filter-input-symbol {
-  width: 16px;
-  height: 16px;
-}
-
 /* #endregion */
 
 /* #region CSS RELATED TO LEAFLET MAP LAYOUT */
