@@ -655,6 +655,7 @@ td:nth-child(2) {
   width: 16px;
   height: 16px;
   padding-left: 3px;
+  fill: #333;
 }
 
 /* #endregion */
