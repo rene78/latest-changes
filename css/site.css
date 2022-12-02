@@ -476,7 +476,7 @@ h2 select {
 }
 
 /* Make sure that the whole input field remains in the darker color when hovering of the x */
-.delete-filter-input:hover ~ .search-changesets-field {
+.delete-filter-input:hover~.search-changesets-field {
   background-color: #008dff;
 }
 
@@ -494,7 +494,8 @@ h2 select {
   font-size: 18px;
   width: 159px;
   height: 42px;
-  vertical-align: top;/*needed to keep the height of the element unchanged (https://stackoverflow.com/a/28157789/5263954)*/
+  vertical-align: top;
+  /*needed to keep the height of the element unchanged (https://stackoverflow.com/a/28157789/5263954)*/
 }
 
 ::placeholder {
@@ -505,6 +506,7 @@ h2 select {
 .search-changesets-field:hover {
   background-color: #008dff;
 }
+
 /* #endregion */
 
 /* #region CSS RELATED TO LEAFLET MAP LAYOUT */
@@ -593,6 +595,8 @@ h2 select {
 
 table {
   border-collapse: collapse;
+  margin: 5px 0;
+  border-top: 1px solid #c9c8c8;
 }
 
 tr {
@@ -652,4 +656,5 @@ td:nth-child(2) {
   height: 16px;
   padding-left: 3px;
 }
+
 /* #endregion */

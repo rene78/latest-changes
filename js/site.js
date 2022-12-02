@@ -61,7 +61,7 @@ L.Control.toggleSidebarButton = L.Control.extend(
                 .addListener(controlDiv, 'click', L.DomEvent.preventDefault)
                 .addListener(controlDiv, 'click', toggleSidebar);
 
-            let controlUI = L.DomUtil.create('a', 'leaflet-toggle-sidebar', controlDiv);
+            let controlUI = L.DomUtil.create('a', 'leaflet-bar-part leaflet-bar-part-single', controlDiv);
             controlUI.title = 'Toggle display of sidebar <Spacebar>';
             controlUI.href = '#';
 
