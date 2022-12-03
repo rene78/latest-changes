@@ -99,10 +99,11 @@ document.addEventListener("keyup", event => {
         toggleSidebar();
     } else if (isLetter || isNumber) {
         let inputField = document.querySelector(".search-changesets-field");
-        //If the input field is empty AND doesn't have focus: Add focus and write typed letter in field.
+        //If the input field is empty AND doesn't have focus: Add focus, write typed letter in field and launch filter function.
         if (!inputField.value && document.activeElement !== inputField) {
             inputField.focus();
             inputField.value = event.key;
+            showHideCrossThenFilter();
         }
     }
 });
@@ -963,6 +964,17 @@ function scrollToTop() {
     });
 }
 
+//Only show X to remove content of filter input after at least one char has been entered. Then launch filterChangesets function.
+function showHideCrossThenFilter() {
+    const searchTerm = document.querySelector(".search-changesets-field").value;
+    const deleteFilterInput = document.querySelector(".delete-filter-input");
+    if (searchTerm.length > 0) deleteFilterInput.classList.remove("hide");
+    else deleteFilterInput.classList.add("hide");
+
+    //Filter changesets
+    filterChangesets();
+}
+
 //Check current zoom level of map and show info message, if zoomed out too far
 map.on('zoom', updateMap);
 //Update location in local storage when panning the map
@@ -995,16 +1007,7 @@ d3.select('#resolution')
 document.querySelector("#download-changesets-button").addEventListener("click", run);
 
 //Once text is typed into the filter changeset input --> Start filterChangesets function
-document.querySelector(".search-changesets-field").addEventListener("input", () => {
-    //Only show X to remove content of filter input after at least one char has been entered
-    const searchTerm = document.querySelector(".search-changesets-field").value;
-    const deleteFilterInput = document.querySelector(".delete-filter-input");
-    if (searchTerm.length > 0) deleteFilterInput.classList.remove("hide");
-    else deleteFilterInput.classList.add("hide");
-
-    //Filter changesets
-    filterChangesets();
-});
+document.querySelector(".search-changesets-field").addEventListener("input", showHideCrossThenFilter);
 
 //Remove content of "filter changeset input" once X is clicked
 document.querySelector(".delete-filter-input").addEventListener("click", () => {
