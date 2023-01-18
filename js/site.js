@@ -225,12 +225,13 @@ function run() {
         bounds.getSouthWest().wrap().lng + ',' +
         bounds.getNorthEast().lat + ',' +
         bounds.getNorthEast().wrap().lng;
-    const overpass_query = '[adiff:"' + calculateAnalysisStartTime() + '"][bbox:' + bbox + '][out:xml][timeout:22];way->.ways;(.ways>;node;);out meta;.ways out geom meta;';
+    // const overpass_query = '[adiff:"' + calculateAnalysisStartTime() + '"][bbox:' + bbox + '][out:xml][timeout:22];way->.ways;(.ways>;node;);out meta;.ways out geom meta;';//This query sometimes only returned nodes. Thus replaced with query below
+    const overpass_query = '[adiff:"' + calculateAnalysisStartTime() + '"][bbox:' + bbox + '][out:xml];nw;out geom meta;';
     // console.log(overpass_server + 'interpreter?data=' + overpass_query);
 
     //Either do an API call to Overpass or use a locally saved xml file for debugging purposes
-    const xmlDataLocation = overpass_server + 'interpreter?data=' + overpass_query; //API call to overpass
-    // const xmlDataLocation = "./examples/example1.xml"; //To load example xml: Comment out line above and uncomment this line
+    // const xmlDataLocation = overpass_server + 'interpreter?data=' + overpass_query; //API call to overpass
+    const xmlDataLocation = "./examples/example1.xml"; //To load example xml: Comment out line above and uncomment this line
 
     xhr = d3.xml(xmlDataLocation
     ).on("error", function (error) {
