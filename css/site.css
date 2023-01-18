@@ -658,4 +658,8 @@ td:nth-child(2) {
   fill: #333;
 }
 
+.clock-with-circular-arrow-symbol:hover {
+  fill: black;
+}
+
 /* #endregion */
