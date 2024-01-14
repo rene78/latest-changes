@@ -581,7 +581,7 @@ h2 select {
   margin: 5px;
   background-color: #000;
   -webkit-mask-image: url(../img/icon-sidebar-left.svg);
-  mask-image: url(../img/icon-sidebar-left.svg-solid.svg);
+  mask-image: url(../img/icon-sidebar-left.svg);
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-position: center;

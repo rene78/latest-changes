@@ -2,10 +2,21 @@
 # Introduction
 *OSM Latest Changes* is a web application that helps to check recent OSM changes within a certain cartographic boundary, for example your home town. It displays all changesets in a list and on a map. The elements can be selected on the map whereby a tag comparison table opens up that highlights all created, modified or deleted tags. Furthermore a so called "Vandalism Meter" has been implemented that helps to find suspicious edits.
 
-Objects that have been altered (i.e. modified, created or deleted) during a selectable time range (i.e. the last day, week or month) are displayed alongside their [changeset](https://wiki.openstreetmap.org/wiki/Changeset) meta data.
-
-Newer edits are displayed in more saturated colors than older modifications. Deleted objects as well as the "previous state" of modified map features are displayed semi-transparently. Intermediate states of objects that have been modified more than once in the selected time period are not shown. The site currently doesn't show OSM modifications of relation objects.
 ![Picture of App][screenshot]
+
+# Visualization
+Newer edits are displayed in more saturated colors than older modifications. Deleted objects as well as the "previous state" of modified map features are displayed semi-transparently. Intermediate states of objects that have been modified more than once in the selected time period are not shown.
+
+# How to use
+1. Go to area of interest and click on *Download Changesets*
+2. Analyse changesets by...
+- filtering for suspicous changesets (red traffic light)
+- selecting elements on the map and see tag modifications
+
+# Limitations
+- The site currently doesn't show OSM modifications of relation objects.
+- Too many or too large download requests can cause the Overpass server to deny the request.
+
 # Running
 Just `git clone` and [boot up a quick development server](https://gist.github.com/tmcw/4989751). If you use *Visual Studio Code* you can alternatively install the *Live Server* extension.
 # History
