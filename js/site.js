@@ -636,7 +636,7 @@ function run() {
 
             const queue = d3.queue();
             while (changesetIds.length > 0) {
-                queue.defer(d3.xml, 'https://www.openstreetmap.org/api/0.6/changesets?changesets=' + changesetIds.splice(0, 100).join(','));//limit queried changesets to 100
+                queue.defer(d3.xml, 'https://api.openstreetmap.org/api/0.6/changesets?changesets=' + changesetIds.splice(0, 100).join(','));//limit queried changesets to 100
             }
             queue.awaitAll(function (error, xmls) {
                 if (error) return console.error(error);
