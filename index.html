@@ -43,7 +43,8 @@
 
   <!-- Style related -->
   <link rel='stylesheet' type='text/css' href='css/site.css' />
-  <link rel="stylesheet" href="//unpkg.com/leaflet@1.7.1/dist/leaflet.css">
+  <!-- <link rel="stylesheet" href="//unpkg.com/leaflet@1.7.1/dist/leaflet.css"> -->
+  <link rel="stylesheet" href="./css/leaflet.css">
   <link rel="stylesheet" href="//unpkg.com/leaflet-gesture-handling/dist/leaflet-gesture-handling.min.css"
     type="text/css">
   <link rel="stylesheet"
@@ -54,16 +55,19 @@
 
   <!-- External scripts -->
   <!-- Leaflet -->
-  <script src="//unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+  <!-- <script src="//unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script> -->
+  <script src="./js/leaflet.js"></script>
   <!-- Leaflet Gesture Handling ("use 2 fingers to pan") -->
   <script src="//unpkg.com/leaflet-gesture-handling"></script>
   <!-- Leaflet control to geolocate the user. -->
-  <script src="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.76.0/dist/L.Control.Locate.min.js"
-    charset="utf-8"></script>
+  <!-- <script src="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.76.0/dist/L.Control.Locate.min.js"
+    charset="utf-8"></script> -->
+    <script src="./js/L.Control.Locate.min.js"></script>
   <!-- Leaflet Contextmenu (Right mouse button menu)-->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-contextmenu/1.4.0/leaflet.contextmenu.min.js"
     integrity="sha512-8sfQf8cr0KjCeN32YPfjvLU2cMvyY1lhCXTMfpTZ16CvwIzeVQtwtKlxeSqFs/TpXjKhp1Dcv77LQmn1VFaOZg=="
     crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <!-- Activate for offline debugging -->
 </head>
 
 <body>

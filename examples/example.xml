@@ -202,7 +202,7 @@
   </node>
 </old>
 <new>
-  <node id="4272229178" lat="47.6529935" lon="9.4742035" version="3" timestamp="2022-06-24T12:16:12Z" changeset="122800892" uid="257555" user="rene78">
+  <node id="4272229178" lat="47.6529935" lon="9.4742035" version="3" timestamp="2024-02-12T12:16:12Z" changeset="122800892" uid="257555" user="rene78">
     <tag k="amenity" v="luggage_locker"/>
   </node>
 </new>
@@ -222,7 +222,7 @@
   </node>
 </old>
 <new>
-  <node id="4802419050" lat="47.6530057" lon="9.4728883" version="6" timestamp="2022-06-24T12:16:12Z" changeset="122800892" uid="257555" user="rene78">
+  <node id="4802419050" lat="47.6530057" lon="9.4728883" version="6" timestamp="2024-02-12T12:16:12Z" changeset="122800892" uid="257555" user="rene78">
     <tag k="amenity" v="social_facility"/>
     <tag k="brand" v="Bahnhofsmission"/>
     <tag k="brand:wikidata" v="Q801713"/>
@@ -406,7 +406,7 @@
   </way>
 </old>
 <new>
-  <way id="437103103" version="6" timestamp="2022-06-24T12:16:12Z" changeset="122800892" uid="257555" user="rene78">
+  <way id="437103103" version="6" timestamp="2024-03-12T12:16:12Z" changeset="122800892" uid="257555" user="rene78">
     <bounds minlat="47.6529481" minlon="9.4706017" maxlat="47.6532025" maxlon="9.4754633"/>
     <nd ref="4349314500" lat="47.6532025" lon="9.4706024"/>
     <nd ref="4349314499" lat="47.6531934" lon="9.4710155"/>
@@ -414,7 +414,7 @@
     <nd ref="4349314495" lat="47.6530972" lon="9.4729869"/>
     <nd ref="4349314493" lat="47.6530303" lon="9.4743743"/>
     <nd ref="4349314491" lat="47.6529852" lon="9.4752889"/>
-    <nd ref="4349314490" lat="47.6529775" lon="9.4754633"/>
+    <nd ref="4349314490" lat="47.656" lon="9.4754633"/>
     <nd ref="4349314488" lat="47.6529481" lon="9.4754599"/>
     <nd ref="7728026949" lat="47.6529657" lon="9.4749543"/>
     <nd ref="7728026950" lat="47.6529685" lon="9.4748711"/>

@@ -205,7 +205,8 @@ function toggleWaitingScreen() {
 const overpass_server = '//overpass-api.de/api/'; //'https://overpass.kumi.systems/api/';
 const deletedElementsLimit = -3; //If 3 more elements or tags have been deleted than added, the traffic light will change to red
 let xhr;
-let layer = null;
+let leafletGeoJsonObject = null; //All the GeoJSON data will go into this variable
+const debugMode = false; //False (default): Do an API call to Overpass. True: Use locally saved xml files for debugging purposes
 
 //Check if map is zoomed in enough
 const isMapZoomedInEnough = updateMap();
@@ -230,8 +231,9 @@ function run() {
     // console.log(overpass_server + 'interpreter?data=' + overpass_query);
 
     //Either do an API call to Overpass or use a locally saved xml file for debugging purposes
-    const xmlDataLocation = overpass_server + 'interpreter?data=' + overpass_query; //API call to overpass
-    //const xmlDataLocation = "./examples/example1.xml"; //To load example xml: Comment out line above and uncomment this line
+    let xmlDataLocation;
+    if (debugMode) xmlDataLocation = "./examples/example.xml"; //Load example xml for debugging purposes. Works offline
+    else xmlDataLocation = overpass_server + 'interpreter?data=' + overpass_query; //API call to overpass
 
     xhr = d3.xml(xmlDataLocation
     ).on("error", function (error) {
@@ -258,9 +260,9 @@ function run() {
                         var newestTs = +new Date(newElement.getAttribute("timestamp"));
                         if (newElement.tagName == 'way') {
                             // inherit meta data from newest child node
-                            var nds = newElement.getElementsByTagName('nd');
-                            for (var j = 0; j < nds.length; j++) {
-                                var nodeId = nds[j].getAttribute('ref');
+                            var nodes = newElement.getElementsByTagName('nd');
+                            for (var j = 0; j < nodes.length; j++) {
+                                var nodeId = nodes[j].getAttribute('ref');
                                 var node = newData.querySelector('node[id="' + nodeId + '"]');
                                 if (node === null) continue;
                                 var nodeTs = +new Date(node.getAttribute("timestamp"));
@@ -303,10 +305,10 @@ function run() {
             document.querySelector("#filter-red-checkbox").checked = false;
 
             //Clear old GeoJSON data from map
-            layer && map.removeLayer(layer);
+            leafletGeoJsonObject && map.removeLayer(leafletGeoJsonObject);
 
             //Create new GeoJSON layer, fill it with features of downloaded OSM data and add it to the map
-            layer = new L.GeoJSON({
+            leafletGeoJsonObject = new L.GeoJSON({
                 type: 'FeatureCollection',
                 features: [].concat(oldGeojson.features).concat(newGeojson.features)
             }, {
@@ -332,19 +334,88 @@ function run() {
 
                 //Increase line weight when feature gets focus
                 layer.on('mouseover', function (e) {
-                    layer.setStyle({ weight: 8 });
+                    // console.log(layer);
+                    layer.setStyle({ weight: 8 }); //increase line weight of hovered layer
+                    //Write both XML nodes of old and new element into variable "xmlElements"
+                    const xmlElements = data.querySelectorAll('[id="' + layer.feature.properties.id + '"]');
+                    // console.log(xmlElements);
+                    const action = xmlElements[0].parentNode.parentNode.getAttribute('type');
+                    // console.log(action);
+                    //Check if action is 'modify'. If yes: Highlight non-hovered twin element of lines and polygons as well. Skip unmoved nodes.
+                    if (action === 'modify') {
+                        // console.log('Modify! Highlight non-hovered twin element as well (i.e. old or new version). If the element is a node: Only highlight twin element if node has been moved');
+                        const idOfHoveredElement = layer.feature.properties.id;
+                        const leafletIdOfHoveredElement = layer._leaflet_id;
+                        // console.log('idofhoveredelement: ' + idOfHoveredElement + ' leafletIdOfHoveredElement: ' + leafletIdOfHoveredElement);
+
+                        //First check if element is a node. If it is: Check if coordinates have changed. If yes: Highlight twin node. If no: stop function execution (no need to traverse layer object and waste resources)
+                        if (xmlElements[0].tagName === "node") {
+                            // console.log('This is a NODE! Now check if the node has been moved');
+                            const latEl0 = xmlElements[0].getAttribute('lat');
+                            const latEl1 = xmlElements[1].getAttribute('lat');
+                            const lonEl0 = xmlElements[0].getAttribute('lon');
+                            const lonEl1 = xmlElements[1].getAttribute('lon');
+                            if (latEl0 == latEl1 && lonEl0 == lonEl1) {
+                                // console.log('Coordinates of node are identical! Do NOT hightlight twin.');
+                                return;
+                            }
+                        }
+                        //All other elements (i.e. lines and polygons): Highlight twin element, even if they have similar geometries.
+                        //This is not very efficient since all the leaflet layers have to be traversed even though  geometry may be unchanged.
+                        //A way to check if a line or polygon has been changed could be to compare the length of new and old element.
+                        //If there is a difference the element has been changed. See https://github.com/tyrasd/geojson-length.
+                        //Not sure whether this is computationally more efficient though, thus not implemented.
+                        highlightTwinElementLocation(idOfHoveredElement, leafletIdOfHoveredElement);
+                    }
                 });
 
                 //Change line weight back when feature loses focus
                 layer.on('mouseout', function (e) {
-                    layer.setStyle({ weight: 3 });
+                    leafletGeoJsonObject.resetStyle();
+                });
+            }
+
+            //Highlight the non-hovered twin element (i.e. the new or old geometry) as well.
+            function highlightTwinElementLocation(idOfHoveredElement, leafletIdOfHoveredElement) {
+                //Each modified element is on the map twice - the old and the new element. Make sure that the corresponding
+                //twin element, on which the mouse is not hovered, is highlighted. The line weight of the outline/node
+                //oscillates between 3 and 8 pixels and the color is changed to red.
+                leafletGeoJsonObject.eachLayer(function (l) {
+                    // console.log(l);
+                    if (l.feature.properties.id === idOfHoveredElement && l._leaflet_id !== leafletIdOfHoveredElement) {
+                        let count = 3;
+                        let direction = 1; // 1 for counting up, -1 for counting down
+                        const interval = setInterval(function () {
+                            if (count === 8) {
+                                direction = -1; // Change direction to count down
+                            } else if (count === 3) {
+                                direction = 1; // Change direction to count up
+                            }
+
+                            count += direction; // Increment or decrement count based on direction
+
+                            // Set the weight property dynamically
+                            l.setStyle({
+                                color: '#008dff',
+                                opacity: 1,
+                                weight: count
+                            });
+
+                        }, 100); // Change the interval duration (in milliseconds) as needed
+
+                        // Clear the interval when mouse is not hovering
+                        leafletGeoJsonObject._layers[leafletIdOfHoveredElement].on('mouseout', function () {
+                            // console.log('clearInterval called!');
+                            clearInterval(interval);
+                        });
+                    }
                 });
             }
 
             changesets = {};//Empty the changesets object in case of a subsequent run
             //var bytime = [];
             //here the leaflet layers and metadata is written into "changesets" object, which then goes to "bytime" array.
-            layer.eachLayer(function (l) {
+            leafletGeoJsonObject.eachLayer(function (l) {
                 if (!l.feature.properties.meta.changeset) return;
                 changesets[l.feature.properties.meta.changeset] = changesets[l.feature.properties.meta.changeset] || {
                     id: l.feature.properties.meta.changeset,
@@ -361,7 +432,7 @@ function run() {
 
             vandalismChecker();//Create object with vandalism analysis for each downloaded changeset
 
-            layer.on('click', function (e) {
+            leafletGeoJsonObject.on('click', function (e) {
                 //Highlight clicked layer on map and in sidebar
                 click({ feature: e.layer });
                 //Scroll selected element into view in sidebar
@@ -627,6 +698,7 @@ function run() {
             }
 
             //Download changeset text and changeset comment count. Once done render changesets list on the left side
+            //Write changeset id's in an array. This is used to create URL for API call
             const changesetIds = [];
             for (const key in changesets) {
                 changesetIds.push(key);
@@ -636,9 +708,17 @@ function run() {
             document.querySelector("#results").innerHTML = "";//Empty old results list (same happens in renderChangeSetsList() "allresults" later on, but because of the API call below the old list in a subsequent call would still be shown for a second while the new GeoJSON data has already been loaded --> confusing UX)
 
             const queue = d3.queue();
-            while (changesetIds.length > 0) {
-                queue.defer(d3.xml, 'https://api.openstreetmap.org/api/0.6/changesets?changesets=' + changesetIds.splice(0, 100).join(','));//limit queried changesets to 100
+
+            //Load a local example file if debug mode is on. If not call the OSM API.
+            if (debugMode) queue.defer(d3.xml, "./examples/exampleOSMAPI.xml");//load local file
+            else {
+                //Fetch data from OSM database. If there are more than 100 changesets to query make multiple API requests with a hundred CS each.
+                while (changesetIds.length > 0) {
+                    console.log('executed');
+                    queue.defer(d3.xml, 'https://api.openstreetmap.org/api/0.6/changesets?changesets=' + changesetIds.splice(0, 100).join(','));//limit queried changesets to 100
+                }
             }
+
             queue.awaitAll(function (error, xmls) {
                 if (error) return console.error(error);
                 // console.log(xmls);
@@ -707,7 +787,7 @@ function renderChangesetsList(changesetsToDisplay) {
             d3.event.preventDefault();
             const id = d.id ? d.id : d.feature.feature.properties.meta.changeset;
             const changesetLayers = L.featureGroup();
-            layer.eachLayer(function (l) {
+            leafletGeoJsonObject.eachLayer(function (l) {
                 if (l.feature.properties.meta.changeset == id) l.addTo(changesetLayers);
             });
             //Zoom and pan to featureGroup
@@ -787,7 +867,7 @@ Sum of all added/deleted tags: ${deltaInTags}. ${deltaInTags < deletedElementsLi
             return moment(d.time).fromNow();
         });
 
-    //Changeset text and changeset comment count (were downloaded separately from OSM)
+    //Changeset text and changeset comment count (were downloaded separately from OSM API)
     rl.append('div').attr('class', 'changeset');
     rl.select('span.text-bubble').each(function (d) {
         if (d.discussionCount > 0) {
@@ -817,11 +897,12 @@ function click(d) {
         .classed('active', function (_) {
             return _.id == (d.id || d.feature.feature.properties.meta.changeset);
         });
-    layer.eachLayer(function (l) {
-        layer.resetStyle(l);
+    //If some other element has been highlighted before then reset the display of those map elements
+    leafletGeoJsonObject.eachLayer(function (l) {
+        leafletGeoJsonObject.resetStyle(l);
     })
     var id = d.id ? d.id : d.feature.feature.properties.meta.changeset;
-    layer.eachLayer(function (l) {
+    leafletGeoJsonObject.eachLayer(function (l) {
         if (l.feature.properties.meta.changeset == id) {
             l.setStyle({ color: '#008dff' });//Highlighting color: blue
         }
@@ -932,7 +1013,7 @@ function filterChangesets() {
     //Filter GeoJSON on map
     function displayGeoJson(changesets) {
         //Remove old GeoJSON
-        layer.eachLayer(function (l) {
+        leafletGeoJsonObject.eachLayer(function (l) {
             map.removeLayer(l);
         });
 
