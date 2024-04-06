@@ -25,7 +25,7 @@ It was first [prototyped](https://osmlab.github.io/latest-changes/) by [@lxbarth
 ## 2013-2021
 A hacked version of this prototype has been created with aims into saving bandwith and rendering time. Furthermore it allows lower zoom levels. It will show changes made in the last 24h, 3 days, 7 days or 30 days. Those enhancements were mainly implemented by [@tyrasd](https://github.com/tyrasd)
 ## 2022-now
-As of July 2022 another updated version has been created, that offers added functionality, i.e. a tag comparison table, a vandalism checker and a filter functionality.
+As of July 2022 another [updated version](https://www.openstreetmap.org/user/rene78/diary/399505) has been created, that offers added functionality, i.e. a tag comparison table, a vandalism checker and a filter functionality.
 
 [social-media-pic]: img/SocialMedia-Latest-Changes.png "Intro Pic"
 [screenshot]: img/multi-devices.png "Picture of the App"

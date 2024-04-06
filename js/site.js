@@ -169,7 +169,7 @@ function updateMap() {
         mapHtml.classList.add("faded");
         infoText.classList.remove("hide");
         button.disabled = "disabled";
-        button.title = "Zoom in to view changes";
+        button.title = "Zoom in to download changes";
         return false;
     }
 }
@@ -232,7 +232,7 @@ function run() {
 
     //Either do an API call to Overpass or use a locally saved xml file for debugging purposes
     let xmlDataLocation;
-    if (debugMode) xmlDataLocation = "./examples/example.xml"; //Load example xml for debugging purposes. Works offline
+    if (debugMode) xmlDataLocation = "./examples/exampleOverpassAPI.xml"; //Load example xml for debugging purposes. Works offline
     else xmlDataLocation = overpass_server + 'interpreter?data=' + overpass_query; //API call to overpass
 
     xhr = d3.xml(xmlDataLocation
@@ -386,7 +386,7 @@ function run() {
                         let count = 3;
                         let direction = 1; // 1 for counting up, -1 for counting down
                         const interval = setInterval(function () {
-                            if (count === 8) {
+                            if (count === 10) {
                                 direction = -1; // Change direction to count down
                             } else if (count === 3) {
                                 direction = 1; // Change direction to count up
@@ -396,7 +396,7 @@ function run() {
 
                             // Set the weight property dynamically
                             l.setStyle({
-                                color: '#008dff',
+                                color: '#008DFF',//Highlight twin geometry in blue
                                 opacity: 1,
                                 weight: count
                             });
@@ -668,10 +668,6 @@ function run() {
 
                             //Case 4: Tags similar --> Don't display this key-value pair
                             else cssClass = "'unchanged'";
-                            // else continue;
-                            // Better option: Add a class "unchanged", hide them and add a button to show similar tags
-                            // Table height needs to update see https://leafletjs.com/reference.html#divoverlay-contentupdate
-                            // table rows can be animated https://stackoverflow.com/a/37376274/5263954
 
                             tableHtml += `
                                 <tr ${(cssClass ? 'class=' + cssClass : '')}>
@@ -714,7 +710,7 @@ function run() {
             else {
                 //Fetch data from OSM database. If there are more than 100 changesets to query make multiple API requests with a hundred CS each.
                 while (changesetIds.length > 0) {
-                    console.log('executed');
+                    // console.log('executed');
                     queue.defer(d3.xml, 'https://api.openstreetmap.org/api/0.6/changesets?changesets=' + changesetIds.splice(0, 100).join(','));//limit queried changesets to 100
                 }
             }
