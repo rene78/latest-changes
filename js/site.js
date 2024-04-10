@@ -371,7 +371,8 @@ function run() {
 
                 //Change line weight back when feature loses focus
                 layer.on('mouseout', function (e) {
-                    leafletGeoJsonObject.resetStyle();
+                    // leafletGeoJsonObject.resetStyle();
+                    layer.setStyle({ weight: 3 });
                 });
             }
 
@@ -385,6 +386,9 @@ function run() {
                     if (l.feature.properties.id === idOfHoveredElement && l._leaflet_id !== leafletIdOfHoveredElement) {
                         let count = 3;
                         let direction = 1; // 1 for counting up, -1 for counting down
+
+                        console.log("pre-hover color: " + l.options.color);//if it is blue: change back to blue on mouseout, else change back to shade of red
+
                         const interval = setInterval(function () {
                             if (count === 10) {
                                 direction = -1; // Change direction to count down
@@ -406,7 +410,10 @@ function run() {
                         // Clear the interval when mouse is not hovering
                         leafletGeoJsonObject._layers[leafletIdOfHoveredElement].on('mouseout', function () {
                             // console.log('clearInterval called!');
-                            clearInterval(interval);
+                            clearInterval(interval);//stop oscillation
+                            leafletGeoJsonObject.resetStyle(l);//reset style of oscillating geometry, i.e. line weight back to 3 and color back shade of red
+                            //PROBLEM: If this geometry belongs to highlighted changeset it should be changed back to the highlighting color (i.e. blue) instead of shade of red
+                            //Solution: If pre-hover color is highlighting color --> reset color back to highlighting color, else reset back to shade of red.
                         });
                     }
                 });
@@ -887,6 +894,7 @@ Sum of all added/deleted tags: ${deltaInTags}. ${deltaInTags < deletedElementsLi
 
 //Highlight clicked layer on map and in sidebar (happens when selecting element in sidebar or on map)
 function click(d) {
+    // console.log(d);
     var results = d3.select('#results');
     results
         .selectAll('div.result')
