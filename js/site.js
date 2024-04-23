@@ -246,8 +246,10 @@ function run() {
             var oldData = document.implementation.createDocument(null, 'osm');
             var elements = data.querySelectorAll('action');
             //Separate changed (new) and pre-change (old) OSM map data into respective xml objects
+            // console.log(elements);
             for (var i = 0; i < elements.length; i++) {
                 var element = elements[i];
+                // console.log(element);
                 switch (element.getAttribute('type')) {
                     case 'create':
                         newData.documentElement.appendChild(element.querySelector("*").cloneNode(true));//cloneNode needed to keep "data" unchanged
@@ -335,18 +337,19 @@ function run() {
                 //Increase line weight when feature gets focus
                 layer.on('mouseover', function (e) {
                     // console.log(layer);
-                    layer.setStyle({ weight: 8 }); //increase line weight of hovered layer
+                    layer.setStyle({ weight: 6 }); //increase line weight of hovered layer
+                    //Now we check if the hovered element got modified (i.e. not deleted nor created).
                     //Write both XML nodes of old and new element into variable "xmlElements"
                     const xmlElements = data.querySelectorAll('[id="' + layer.feature.properties.id + '"]');
                     // console.log(xmlElements);
                     const action = xmlElements[0].parentNode.parentNode.getAttribute('type');
                     // console.log(action);
-                    //Check if action is 'modify'. If yes: Highlight non-hovered twin element of lines and polygons as well. Skip unmoved nodes.
+                    //Check if action is 'modify'. If yes: Highlight non-hovered twin element of nodes, lines and polygons as well. Skip unmoved elements.
                     if (action === 'modify') {
                         // console.log('Modify! Highlight non-hovered twin element as well (i.e. old or new version). If the element is a node: Only highlight twin element if node has been moved');
-                        const idOfHoveredElement = layer.feature.properties.id;
-                        const leafletIdOfHoveredElement = layer._leaflet_id;
-                        // console.log('idofhoveredelement: ' + idOfHoveredElement + ' leafletIdOfHoveredElement: ' + leafletIdOfHoveredElement);
+                        const idOfHoveredElement = layer.feature.properties.id;//OSM element ID
+                        const leafletIdOfHoveredElement = leafletGeoJsonObject.getLayerId(layer);//Internal Leaflet layer ID
+                        //console.log('idofhoveredelement: ' + idOfHoveredElement + ' leafletIdOfHoveredElement: ' + leafletIdOfHoveredElement);
 
                         //First check if element is a node. If it is: Check if coordinates have changed. If yes: Highlight twin node. If no: stop function execution (no need to traverse layer object and waste resources)
                         if (xmlElements[0].tagName === "node") {
@@ -355,17 +358,53 @@ function run() {
                             const latEl1 = xmlElements[1].getAttribute('lat');
                             const lonEl0 = xmlElements[0].getAttribute('lon');
                             const lonEl1 = xmlElements[1].getAttribute('lon');
-                            if (latEl0 == latEl1 && lonEl0 == lonEl1) {
-                                // console.log('Coordinates of node are identical! Do NOT hightlight twin.');
-                                return;
+                            if (latEl0 !== latEl1 || lonEl0 !== lonEl1) {
+                                // console.log('Coordinates of old and new node are NOT identical --> node has been moved! Highlight twin element.');
+                                const leafletLayerOfTwin = findLeafletLayerOfTwin(idOfHoveredElement, leafletIdOfHoveredElement);
+                                // console.log('leafletLayerOfTwin: ' + leafletLayerOfTwin);
+                                if (!leafletLayerOfTwin) {
+                                    // console.log('Twin element is not available. This usually means that 1. The node is part of way 2. The old version of the node had no tags. "osmtogeojson" will not convert those nodes into GeoJSON');
+                                    return;
+                                }
+                                highlightTwinElementLocation(layer, leafletLayerOfTwin);
                             }
                         }
-                        //All other elements (i.e. lines and polygons): Highlight twin element, even if they have similar geometries.
-                        //This is not very efficient since all the leaflet layers have to be traversed even though  geometry may be unchanged.
-                        //A way to check if a line or polygon has been changed could be to compare the length of new and old element.
-                        //If there is a difference the element has been changed. See https://github.com/tyrasd/geojson-length.
-                        //Not sure whether this is computationally more efficient though, thus not implemented.
-                        highlightTwinElementLocation(idOfHoveredElement, leafletIdOfHoveredElement);
+                        //All other elements (i.e. lines and polygons): Highlight twin element if the geometry has been changed.
+                        //A way to check if a line or polygon has been changed is to compare the length of new and old element.
+                        //If there is a difference the element has been changed. Solution below is from https://github.com/tyrasd/geojson-length.
+                        //This can be computationally demanding on complex LineStrings and polgyons. Thus simply highlight all
+                        //twin elements - regardless of whether the geometry has been changed or not - if node count is greater than 50.
+                        else if (xmlElements[0].tagName === "way") {
+                            // console.log(layer);
+
+                            const leafletLayerOfTwin = findLeafletLayerOfTwin(idOfHoveredElement, leafletIdOfHoveredElement);
+                            // console.log('leafletLayerOfTwin: ' + leafletLayerOfTwin);
+
+                            //Check if node count of line/polygon is greater than 50. if yes just highlight twin without measuring
+                            const nNodes = xmlElements[0].getElementsByTagName('nd').length;
+                            // console.log(nNodes);
+                            if (nNodes > 50) {
+                                // console.log('Node count is large (>50). So skip the length comparison and highlight twin geometry no matter if there is a length difference or not.');
+                                highlightTwinElementLocation(layer, leafletLayerOfTwin);
+                                return;
+                            };
+
+                            //Get length of hovered element
+                            const lengthOfHoveredElement = calculateLengthOfLineOrPolygon(layer.feature.geometry);
+                            // console.log('lengthOfHoveredElement: ' + lengthOfHoveredElement);
+
+                            //Get length of twin element
+                            const lengthOfTwinElement = calculateLengthOfLineOrPolygon(leafletLayerOfTwin.feature.geometry);
+                            // console.log('lengthOfTwinElement: ' + lengthOfTwinElement);
+
+                            //Compare the two. First round to full meters
+                            // console.log('lengthOfHoveredElement (rounded): ' + Math.round(lengthOfHoveredElement));
+
+                            if (Math.round(lengthOfHoveredElement) !== Math.round(lengthOfTwinElement)) {
+                                // console.log('The elements have different lengths, thus the geometry most probably got changed. Highlight the twin elemnt.');
+                                highlightTwinElementLocation(layer, leafletLayerOfTwin);
+                            }
+                        }
                     }
                 });
 
@@ -376,51 +415,110 @@ function run() {
                 });
             }
 
-            //Highlight the non-hovered twin element (i.e. the new or old geometry) as well.
-            function highlightTwinElementLocation(idOfHoveredElement, leafletIdOfHoveredElement) {
-                //Each modified element is on the map twice - the old and the new element. Make sure that the corresponding
-                //twin element, on which the mouse is not hovered, is highlighted. The line weight of the outline/node
-                //oscillates between 3 and 8 pixels and the color is changed to red.
+            //Find and return the Leaflet layer of the non-hovered twin element
+            function findLeafletLayerOfTwin(idOfHoveredElement, leafletIdOfHoveredElement,) {
+                let leafletLayerOfTwin;
                 leafletGeoJsonObject.eachLayer(function (l) {
-                    // console.log(l);
-                    if (l.feature.properties.id === idOfHoveredElement && l._leaflet_id !== leafletIdOfHoveredElement) {
-                        let count = 3;
-                        let direction = 1; // 1 for counting up, -1 for counting down
+                    if (l.feature.properties.id === idOfHoveredElement && leafletGeoJsonObject.getLayerId(l) !== leafletIdOfHoveredElement) {
+                        // console.log('leafletGeoJsonObject.getLayerId(l): ' + leafletGeoJsonObject.getLayerId(l));
+                        const leafletIdOfTwin = leafletGeoJsonObject.getLayerId(l);
+                        leafletLayerOfTwin = leafletGeoJsonObject.getLayer(leafletIdOfTwin);
+                    }
+                });
+                return leafletLayerOfTwin;
+            }
 
-                        console.log("pre-hover color: " + l.options.color);//if it is blue: change back to blue on mouseout, else change back to shade of red
+            //Calculate length of LineString or polygon. Needed to compare 2 LineStrings or polygons to see if they have different lengths
+            function calculateLengthOfLineOrPolygon(geometry) {
+                // console.log(geometry);
+                if (geometry.type === 'LineString')
+                    return calculateLength(geometry.coordinates);
+                else if (geometry.type === 'MultiLineString' || geometry.type === 'Polygon')
+                    return geometry.coordinates.reduce(function (memo, coordinates) {
+                        return memo + calculateLength(coordinates);
+                    }, 0);
+                else
+                    return null;
 
-                        const interval = setInterval(function () {
-                            if (count === 10) {
-                                direction = -1; // Change direction to count down
-                            } else if (count === 3) {
-                                direction = 1; // Change direction to count up
-                            }
+                function calculateLength(lineString) {
+                    // console.log(lineString);
+                    if (lineString.length < 2)
+                        return 0;
+                    var result = 0;
+                    for (var i = 1; i < lineString.length; i++) {
+                        // console.log(result);
+                        result += distance(lineString[i - 1][0], lineString[i - 1][1],
+                            lineString[i][0], lineString[i][1]);
+                    }
+                    return result;
+                }
 
-                            count += direction; // Increment or decrement count based on direction
+                /**
+                 * Calculate the approximate distance between two coordinates (lat/lon)
+                 *
+                 * © Chris Veness, MIT-licensed,
+                 * http://www.movable-type.co.uk/scripts/latlong.html#equirectangular
+                 */
+                function distance(λ1, φ1, λ2, φ2) {
+                    const R = 6371000;
+                    Δλ = (λ2 - λ1) * Math.PI / 180;
+                    φ1 = φ1 * Math.PI / 180;
+                    φ2 = φ2 * Math.PI / 180;
+                    const x = Δλ * Math.cos((φ1 + φ2) / 2);
+                    const y = (φ2 - φ1);
+                    const d = Math.sqrt(x * x + y * y);
+                    return R * d;
+                };
+            }
 
-                            // Set the weight property dynamically
-                            l.setStyle({
-                                color: '#008DFF',//Highlight twin geometry in blue
-                                opacity: 1,
-                                weight: count
-                            });
+            //Highlight the non-hovered twin element (i.e. the new or old geometry) as well.
+            function highlightTwinElementLocation(leafletLayerOfHoveredElement, leafletLayerOfTwin) {
+                let count = 3;
+                let direction = 1; // 1 for counting up, -1 for counting down
 
-                        }, 100); // Change the interval duration (in milliseconds) as needed
+                //if it is blue: change back to blue on mouseout, else change back to shade of red
+                const preHoverColor = leafletLayerOfTwin.options.color;
+                //console.log('%c Pre-hover color: ' + preHoverColor + '', 'background: ' + preHoverColor + '; color: #000000');
 
-                        // Clear the interval when mouse is not hovering
-                        leafletGeoJsonObject._layers[leafletIdOfHoveredElement].on('mouseout', function () {
-                            // console.log('clearInterval called!');
-                            clearInterval(interval);//stop oscillation
-                            leafletGeoJsonObject.resetStyle(l);//reset style of oscillating geometry, i.e. line weight back to 3 and color back shade of red
-                            //PROBLEM: If this geometry belongs to highlighted changeset it should be changed back to the highlighting color (i.e. blue) instead of shade of red
-                            //Solution: If pre-hover color is highlighting color --> reset color back to highlighting color, else reset back to shade of red.
+                const interval = setInterval(function () {
+                    if (count === 10) {
+                        direction = -1; // Change direction to count down
+                    } else if (count === 3) {
+                        direction = 1; // Change direction to count up
+                    }
+
+                    count += direction; // Increment or decrement count based on direction
+
+                    // Set the weight property dynamically
+                    leafletLayerOfTwin.setStyle({
+                        color: '#ff9900',//Highlight twin geometry in a bright orange
+                        opacity: 1,
+                        weight: count
+                    });
+
+                }, 100); // Change the interval duration (in milliseconds) as needed
+
+                // Clear the interval when mouse is not hovering
+                leafletLayerOfHoveredElement.once('mouseout', function () {
+                    //'Once' is needed to remove the mouseout event listener after execution. Else multiple mouseout
+                    //event listeners are created on each mouseover event. This would lead to the following situation:
+                    //This mouseout function would be called multiple times on subsequent mouseouts,
+                    //e.g. after 'mousevering' over the same element the 6th time this mouseout function is called 6 times instead of once.
+                    
+                    // console.log('clearInterval called!');
+                    clearInterval(interval);//stop oscillation of line weight
+                    leafletGeoJsonObject.resetStyle(leafletLayerOfTwin);//reset style of oscillating geometry, i.e. line weight back to 3, opacity back to previous value and color back shade of red
+                    //If this geometry belongs to highlighted changeset --> change it back to the highlighting color (i.e. blue)
+                    if (preHoverColor === '#008dff') {
+                        // console.log('%c The color is blue! ', 'background: ' + preHoverColor + '; color: #000000', 'So change color back to blue');
+                        leafletLayerOfTwin.setStyle({
+                            color: '#008dff',//Change color of twin geometry back to blue
                         });
                     }
                 });
             }
 
             changesets = {};//Empty the changesets object in case of a subsequent run
-            //var bytime = [];
             //here the leaflet layers and metadata is written into "changesets" object, which then goes to "bytime" array.
             leafletGeoJsonObject.eachLayer(function (l) {
                 if (!l.feature.properties.meta.changeset) return;
@@ -899,13 +997,14 @@ function click(d) {
     results
         .selectAll('div.result')
         .classed('active', function (_) {
-            return _.id == (d.id || d.feature.feature.properties.meta.changeset);
+            return _.id == (d.id || d.feature.feature.properties.meta.changeset);//'d.id' is available if changeset was selected in sidebar. 'd.feature...' is available in leaflet layer
         });
-    //If some other element has been highlighted before then reset the display of those map elements
-    leafletGeoJsonObject.eachLayer(function (l) {
-        leafletGeoJsonObject.resetStyle(l);
-    })
-    var id = d.id ? d.id : d.feature.feature.properties.meta.changeset;
+    //Reset the display of all map elements (to reset previously highlighted elements) 
+    leafletGeoJsonObject.resetStyle();
+
+    const id = d.id ? d.id : d.feature.feature.properties.meta.changeset; //'d.id' is available if changeset was selected in sidebar. 'd.feature...' is available in leaflet layer
+
+    //Highlight all layers with a certain changeset number
     leafletGeoJsonObject.eachLayer(function (l) {
         if (l.feature.properties.meta.changeset == id) {
             l.setStyle({ color: '#008dff' });//Highlighting color: blue

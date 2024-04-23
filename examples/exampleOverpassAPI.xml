@@ -406,7 +406,7 @@
   </way>
 </old>
 <new>
-  <way id="437103103" version="6" timestamp="2024-03-12T12:16:12Z" changeset="122800892" uid="257555" user="rene78">
+  <way id="437103103" version="6" timestamp="2024-04-15T12:16:12Z" changeset="122800892" uid="257555" user="rene78">
     <bounds minlat="47.6529481" minlon="9.4706017" maxlat="47.6532025" maxlon="9.4754633"/>
     <nd ref="4349314500" lat="47.6532025" lon="9.4706024"/>
     <nd ref="4349314499" lat="47.6531934" lon="9.4710155"/>
@@ -414,7 +414,7 @@
     <nd ref="4349314495" lat="47.6530972" lon="9.4729869"/>
     <nd ref="4349314493" lat="47.6530303" lon="9.4743743"/>
     <nd ref="4349314491" lat="47.6529852" lon="9.4752889"/>
-    <nd ref="4349314490" lat="47.656" lon="9.4754633"/>
+    <nd ref="4349314490" lat="47.654" lon="9.475"/>
     <nd ref="4349314488" lat="47.6529481" lon="9.4754599"/>
     <nd ref="7728026949" lat="47.6529657" lon="9.4749543"/>
     <nd ref="7728026950" lat="47.6529685" lon="9.4748711"/>
@@ -443,6 +443,27 @@
     <tag k="tactile_paving" v="no"/>
     <tag k="wheelchair" v="limited"/>
     <tag k="width" v="2"/>
+  </way>
+</new>
+</action>
+<action type="modify">
+<old>
+  <way id="999999999" version="1" timestamp="2021-04-15T21:20:54Z" changeset="103017971" uid="257555" user="rene78">
+    <bounds minlat="47.656" minlon="9.477" maxlat="47.6568163" maxlon="9.4785357"/>
+    <nd ref="8633427174" lat="47.6568163" lon="9.4785357"/>
+    <nd ref="5851708120" lat="47.656" lon="9.477"/>
+    <tag k="highway" v="service"/>
+    <tag k="service" v="driveway"/>
+  </way>
+</old>
+<new>
+  <way id="999999999" version="2" timestamp="2024-04-15T21:20:54Z" changeset="103017971" uid="257555" user="rene78">
+    <bounds minlat="47.6566572" minlon="9.4775609" maxlat="47.6568163" maxlon="9.4785357"/>
+    <nd ref="8633427174" lat="47.6568163" lon="9.4785357"/>
+    <nd ref="5851708120" lat="47.6566572" lon="9.4775609"/>
+    <tag k="highway" v="service"/>
+    <tag k="service" v="driveway"/>
+    <tag k="name" v="Pennyroad Lane"/>
   </way>
 </new>
 </action>
