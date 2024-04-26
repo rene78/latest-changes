@@ -203,7 +203,7 @@ function toggleWaitingScreen() {
 
 //On page load: Check if map is zoomed in enough. If yes: Download OSM changeset data from overpass via XHR request
 const overpass_server = '//overpass-api.de/api/'; //'https://overpass.kumi.systems/api/';
-const deletedElementsLimit = -3; //If 3 more elements or tags have been deleted than added, the traffic light will change to red
+const vandalismThreshold = -3; //If 3 more elements or tags have been deleted than added, the traffic light will change to red
 let xhr;
 let leafletGeoJsonObject = null; //All the GeoJSON data will go into this variable
 const debugMode = false; //False (default): Do an API call to Overpass. True: Use locally saved xml files for debugging purposes
@@ -242,13 +242,13 @@ function run() {
     })
         .on('load', function (data) {
             // console.log(data);
-            var newData = document.implementation.createDocument(null, 'osm');
-            var oldData = document.implementation.createDocument(null, 'osm');
-            var elements = data.querySelectorAll('action');
+            let newData = document.implementation.createDocument(null, 'osm');
+            let oldData = document.implementation.createDocument(null, 'osm');
+            const elements = data.querySelectorAll('action');
             //Separate changed (new) and pre-change (old) OSM map data into respective xml objects
             // console.log(elements);
-            for (var i = 0; i < elements.length; i++) {
-                var element = elements[i];
+            for (let i = 0; i < elements.length; i++) {
+                const element = elements[i];
                 // console.log(element);
                 switch (element.getAttribute('type')) {
                     case 'create':
@@ -363,7 +363,7 @@ function run() {
                                 const leafletLayerOfTwin = findLeafletLayerOfTwin(idOfHoveredElement, leafletIdOfHoveredElement);
                                 // console.log('leafletLayerOfTwin: ' + leafletLayerOfTwin);
                                 if (!leafletLayerOfTwin) {
-                                    // console.log('Twin element is not available. This usually means that 1. The node is part of way 2. The old version of the node had no tags. "osmtogeojson" will not convert those nodes into GeoJSON');
+                                    // console.log('Twin element is not available. This usually means that 1. The node is part of way 2. The old version of the node had no tags. "osmtogeojson" will NOT convert those nodes into GeoJSON');
                                     return;
                                 }
                                 highlightTwinElementLocation(layer, leafletLayerOfTwin);
@@ -504,7 +504,7 @@ function run() {
                     //event listeners are created on each mouseover event. This would lead to the following situation:
                     //This mouseout function would be called multiple times on subsequent mouseouts,
                     //e.g. after 'mousevering' over the same element the 6th time this mouseout function is called 6 times instead of once.
-                    
+
                     // console.log('clearInterval called!');
                     clearInterval(interval);//stop oscillation of line weight
                     leafletGeoJsonObject.resetStyle(leafletLayerOfTwin);//reset style of oscillating geometry, i.e. line weight back to 3, opacity back to previous value and color back shade of red
@@ -530,12 +530,11 @@ function run() {
                     deltaInNodesWays: 0,
                     deltaInTags: 0,
                     possibleVandalism: false,
+                    osmEditor: '',
                     layers: []
                 };
                 changesets[l.feature.properties.meta.changeset].layers.push(l);
             });
-
-            vandalismChecker();//Create object with vandalism analysis for each downloaded changeset
 
             leafletGeoJsonObject.on('click', function (e) {
                 //Highlight clicked layer on map and in sidebar
@@ -561,85 +560,6 @@ function run() {
                     .setContent(tableHtml)
                     .openOn(map);
             });
-
-            /*Vandalism Checker
-            Simple sanity checker for all the downloaded changesets. It summarizes all elements and tags which have been added or deleted
-            in the changeset. If the sum is below a certain treshold (currently -3) then a traffic light changes to red to alert the user
-            of this changeset.*/
-            function vandalismChecker() {
-                let actions = data.querySelectorAll("action");
-                // console.log(actions);
-                for (let i = 0; i < actions.length; i++) {
-                    //Get type, i.e. "create", "modify" or "delete"
-                    const type = actions[i].getAttribute("type");
-                    // console.log(type);
-
-                    //Get changeset number
-                    let changesetNumber
-                    if (type === "create") changesetNumber = actions[i].lastElementChild.getAttribute("changeset");
-                    else changesetNumber = actions[i].lastElementChild.firstElementChild.getAttribute("changeset");
-                    // console.log(changesetNumber);
-
-                    //Check which action is performed
-                    //"Create"
-                    //deltaInNodesWays++
-                    //deltaInTags += nTagsAdded
-                    if (type === "create" && changesets[changesetNumber]) {
-                        //Check the amount of tags that have been added
-                        const nTagsAdded = actions[i].lastElementChild.querySelectorAll("tag").length;
-                        // console.log(nTagsAdded);
-                        changesets[changesetNumber].deltaInTags += nTagsAdded;
-
-                        //If a node with 0 tags has been created: Do not add it to deltaInNodesWays
-                        //(normally it is just a newly created node of an already existing way)
-
-                        //Get element type (i.e. "node" or "way")
-                        const elementType = actions[i].firstElementChild.nodeName;
-                        // console.log(elementType);
-
-                        if (elementType === "node" && nTagsAdded == 0) continue;
-                        else changesets[changesetNumber].deltaInNodesWays++;
-                    }
-
-                    // "Modify"
-                    //deltaInNodesWays = unchanged
-                    //deltaInTags += nTagsNew - nTagsOld
-                    if (type === "modify" && changesets[changesetNumber]) {
-                        const nTagsNew = actions[i].lastElementChild.firstElementChild.querySelectorAll("tag").length;
-                        const nTagsOld = actions[i].firstElementChild.firstElementChild.querySelectorAll("tag").length;
-                        // console.log(nTagsNew);
-                        // console.log(nTagsOld);
-                        changesets[changesetNumber].deltaInTags += (nTagsNew - nTagsOld);
-                    }
-
-                    // "Delete"
-                    //deltaInNodesWays--
-                    //deltaInTags -= nTags
-                    if (type === "delete" && changesets[changesetNumber]) {
-                        const nTagsDeleted = actions[i].firstElementChild.querySelectorAll("tag").length;
-                        // console.log(nTagsDeleted);
-                        changesets[changesetNumber].deltaInTags -= nTagsDeleted;
-
-                        //If a node with 0 tags has been deleted: Do not subtract it from deltaInNodesWays
-                        // (normally it is just a newly deleted node of an already existing way)
-
-                        //Get element type (i.e. "node" or "way")
-                        const elementType = actions[i].firstElementChild.firstElementChild.nodeName;
-                        // console.log(elementType);
-                        //Check the amount of tags before deletion
-                        const nTagsBeforeDeletion = actions[i].firstElementChild.firstElementChild.querySelectorAll("tag").length;
-                        // console.log(nTagsBeforeDeletion);
-                        if (elementType === "node" && nTagsBeforeDeletion == 0) continue;
-                        else changesets[changesetNumber].deltaInNodesWays--;
-                    }
-                }
-                for (const changeset in changesets) {
-                    // console.log(changeset);
-                    if ((changesets[changeset].deltaInNodesWays < deletedElementsLimit) || (changesets[changeset].deltaInTags < deletedElementsLimit)) {
-                        changesets[changeset].possibleVandalism = true;
-                    }
-                }
-            }
 
             //Create tag comparison table
             function createTable(id) {
@@ -828,15 +748,129 @@ function run() {
                     // console.log(css);
                     for (let i = 0; i < css.length; i++) {
                         const cid = css[i].getAttribute('id');
+                        //Write discussion count to changesets object
                         changesets[cid].discussionCount = +css[i].getAttribute("comments_count");
-                        const tag = css[i].querySelector('tag[k="comment"]');
-                        if (tag)
-                            changesets[cid].comment = tag.getAttribute('v');
+                        //Write changeset comment to changesets object
+                        const commentTag = css[i].querySelector('tag[k="comment"]');
+                        if (commentTag)
+                            changesets[cid].comment = commentTag.getAttribute('v');
+
+                        //Get sum of warnings and resolved iD warnings for each changeset and write the delta into changesets object
+                        // console.log(css[i]);
+                        const tagsWithResolvedIdWarnings = css[i].querySelectorAll('tag[k^="resolved"]');
+                        const nIdResolvedWarnings = getSumOfiDWarningsAndResolvedWarnings(tagsWithResolvedIdWarnings);
+                        const tagsWithIdWarnings = css[i].querySelectorAll('tag[k^="warning"]');
+                        const nIdWarnings = getSumOfiDWarningsAndResolvedWarnings(tagsWithIdWarnings);
+
+                        function getSumOfiDWarningsAndResolvedWarnings(tagsWithResolvedIdWarnings) {
+                            let counter = 0;
+                            tagsWithResolvedIdWarnings.forEach(tag => {
+                                const value = +tag.getAttribute('v');
+                                // console.log(value);
+                                counter += value;
+                            });
+                            return counter;
+                        }
+                        changesets[cid].deltaInIdWarningsAndResolves = nIdResolvedWarnings - nIdWarnings;
+
+                        ////Get name of used OSM editor
+
+                        const osmEditorTag = css[i].querySelector('tag[k="created_by"]');
+                        if (osmEditorTag)
+                            changesets[cid].osmEditor = osmEditorTag.getAttribute('v');
                     }
                 });
+
+                /*Vandalism Checker
+                Simple sanity checker for all the downloaded changesets. 3 things are checked:
+                1. It summarizes the number of all elements which have been added or deleted
+                1. It summarizes the number of all elements which have been added or deleted
+                3. It summarizes the number of all iD warnings and resolved iD warnings
+                for each changeset. If the sum is below a certain treshold (currently -3) then a traffic light changes to red to alert the user
+                of this changeset.*/
+                function vandalismChecker() {
+                    // console.log(elements);
+                    for (let i = 0; i < elements.length; i++) {
+                        //Get type, i.e. "create", "modify" or "delete"
+                        const type = elements[i].getAttribute("type");
+                        // console.log(type);
+
+                        //Get changeset number
+                        let changesetNumber
+                        if (type === "create") changesetNumber = elements[i].lastElementChild.getAttribute("changeset");
+                        else changesetNumber = elements[i].lastElementChild.firstElementChild.getAttribute("changeset");
+                        // console.log(changesetNumber);
+
+                        //Check which action is performed
+                        //"Create"
+                        //deltaInNodesWays++
+                        //deltaInTags += nTagsAdded
+                        if (type === "create" && changesets[changesetNumber]) {
+                            //Check the amount of tags that have been added
+                            const nTagsAdded = elements[i].lastElementChild.querySelectorAll("tag").length;
+                            // console.log(nTagsAdded);
+                            changesets[changesetNumber].deltaInTags += nTagsAdded;
+
+                            //If a node with 0 tags has been created: Do not add it to deltaInNodesWays
+                            //(normally it is just a newly created node of an already existing way)
+
+                            //Get element type (i.e. "node" or "way")
+                            const elementType = elements[i].firstElementChild.nodeName;
+                            // console.log(elementType);
+
+                            if (elementType === "node" && nTagsAdded == 0) continue;
+                            else changesets[changesetNumber].deltaInNodesWays++;
+                        }
+
+                        // "Modify"
+                        //deltaInNodesWays = unchanged
+                        //deltaInTags += nTagsNew - nTagsOld
+                        if (type === "modify" && changesets[changesetNumber]) {
+                            const nTagsNew = elements[i].lastElementChild.firstElementChild.querySelectorAll("tag").length;
+                            const nTagsOld = elements[i].firstElementChild.firstElementChild.querySelectorAll("tag").length;
+                            // console.log(nTagsNew);
+                            // console.log(nTagsOld);
+                            changesets[changesetNumber].deltaInTags += (nTagsNew - nTagsOld);
+                        }
+
+                        // "Delete"
+                        //deltaInNodesWays--
+                        //deltaInTags -= nTags
+                        if (type === "delete" && changesets[changesetNumber]) {
+                            const nTagsDeleted = elements[i].firstElementChild.querySelectorAll("tag").length;
+                            // console.log(nTagsDeleted);
+                            changesets[changesetNumber].deltaInTags -= nTagsDeleted;
+
+                            //If a node with 0 tags has been deleted: Do not subtract it from deltaInNodesWays
+                            // (normally it is just a newly deleted node of an already existing way)
+
+                            //Get element type (i.e. "node" or "way")
+                            const elementType = elements[i].firstElementChild.firstElementChild.nodeName;
+                            // console.log(elementType);
+                            //Check the amount of tags before deletion
+                            const nTagsBeforeDeletion = elements[i].firstElementChild.firstElementChild.querySelectorAll("tag").length;
+                            // console.log(nTagsBeforeDeletion);
+                            if (elementType === "node" && nTagsBeforeDeletion == 0) continue;
+                            else changesets[changesetNumber].deltaInNodesWays--;
+                        }
+                    }
+
+                    //Write boolean value 'possibleVandalims' into 'changesets'
+                    for (const changeset in changesets) {
+                        // console.log(changeset);
+
+                        //Check how many warnings and resolves iD editor produced.
+                        // console.log("Changeset number: " + changeset + ", deltaInIdWarningsAndResolves: " + changesets[changeset].deltaInIdWarningsAndResolves);
+
+                        if ((changesets[changeset].deltaInNodesWays < vandalismThreshold) || (changesets[changeset].deltaInTags < vandalismThreshold) || (changesets[changeset].deltaInIdWarningsAndResolves < vandalismThreshold)) {
+                            changesets[changeset].possibleVandalism = true;
+                        }
+                    }
+                }
+
                 // console.log(changesets);
-                //Render changesets list on the left side
-                renderChangesetsList(changesets);
+                vandalismChecker();//Analyse each changeset and create boolean "possibleVandalism" within "changesets" object
+                renderChangesetsList(changesets);//Render changesets list on the left side
             });
         }).get();
 }
@@ -915,18 +949,25 @@ function renderChangesetsList(changesetsToDisplay) {
             const possibleVandalism = changesets[changesetNumber].possibleVandalism;
             const deltaInNodesWays = changesets[changesetNumber].deltaInNodesWays;
             const deltaInTags = changesets[changesetNumber].deltaInTags;
+            const deltaInIdWarningsAndResolves = changesets[changesetNumber].deltaInIdWarningsAndResolves;
+            const usedEditorWasId = changesets[changesetNumber].osmEditor.toLowerCase().startsWith("id");
+            // console.log('OSM Editor: ' + changesets[changesetNumber].osmEditor + ', usedEditorWasId: ' + usedEditorWasId);
             let titleText;
+            //Only show the line "All resolved iD warnings..." if the used editor was actually iD
             if (possibleVandalism) {
                 titleText = `This changeset is potentially destructive!
-Sum of all added/deleted nodes or ways: ${deltaInNodesWays}. ${deltaInNodesWays < deletedElementsLimit ? "This is suspicious!" : ""}
-Sum of all added/deleted tags: ${deltaInTags}. ${deltaInTags < deletedElementsLimit ? "This is suspicious!" : ""}
+All added nodes/ways minus - deleted nodes/ways: ${deltaInNodesWays}. ${deltaInNodesWays < vandalismThreshold ? "This is suspicious!" : ""}
+All added tags minus deleted tags: ${deltaInTags}. ${deltaInTags < vandalismThreshold ? "This is suspicious!" : ""}
+${usedEditorWasId ? `All resolved iD warnings minus new iD warnings: ${deltaInIdWarningsAndResolves}. ${deltaInIdWarningsAndResolves < vandalismThreshold ? "This is suspicious!" : ""}` : ""}
 
 Reminder: It is often NOT necessary to delete elements in OSM. For example a closed shop should be tagged as 'disused:shop'. One day a new shop might open at the same exact lot and the tags can be updated. The same is true for demolished buildings ('demolished:building')
 `
             } else {
                 titleText = `This changeset looks good!
-Sum of all added/deleted nodes or ways: ${deltaInNodesWays}. ${deltaInNodesWays < deletedElementsLimit ? "This is suspicious!" : ""}
-Sum of all added/deleted tags: ${deltaInTags}. ${deltaInTags < deletedElementsLimit ? "This is suspicious!" : ""}`
+All added nodes/ways minus - deleted nodes/ways: ${deltaInNodesWays}. ${deltaInNodesWays < vandalismThreshold ? "This is suspicious!" : ""}
+All added tags minus deleted tags: ${deltaInTags}. ${deltaInTags < vandalismThreshold ? "This is suspicious!" : ""}
+${usedEditorWasId ? `All resolved iD warnings minus new iD warnings: ${deltaInIdWarningsAndResolves}. ${deltaInIdWarningsAndResolves < vandalismThreshold ? "This is suspicious!" : ""}` : ""}
+`
             }
             return titleText;
         })
