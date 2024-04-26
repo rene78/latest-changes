@@ -599,7 +599,7 @@ function run() {
                                 </tr>
                                 <tr class="metatags">
                                     <td>timestamp</td>
-                                    <td>${node[0].getAttribute("timestamp")}</td>
+                                    <td>${moment(node[0].getAttribute("timestamp")).fromNow()}</td>
                                 </tr>
                                 <tr class="metatags">
                                     <td>user</td>
