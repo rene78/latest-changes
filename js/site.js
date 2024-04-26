@@ -398,9 +398,9 @@ function run() {
                             // console.log('lengthOfTwinElement: ' + lengthOfTwinElement);
 
                             //Compare the two. First round to full meters
-                            // console.log('lengthOfHoveredElement (rounded): ' + Math.round(lengthOfHoveredElement));
+                            // console.log('lengthOfHoveredElement (rounded): ' + +lengthOfHoveredElement.toFixed(1));
 
-                            if (Math.round(lengthOfHoveredElement) !== Math.round(lengthOfTwinElement)) {
+                            if (+lengthOfHoveredElement.toFixed(1) !== +lengthOfTwinElement.toFixed(1)) {
                                 // console.log('The elements have different lengths, thus the geometry most probably got changed. Highlight the twin elemnt.');
                                 highlightTwinElementLocation(layer, leafletLayerOfTwin);
                             }
