@@ -955,18 +955,20 @@ function renderChangesetsList(changesetsToDisplay) {
             let titleText;
             //Only show the line "All resolved iD warnings..." if the used editor was actually iD
             if (possibleVandalism) {
-                titleText = `This changeset is potentially destructive!
-All added nodes/ways minus - deleted nodes/ways: ${deltaInNodesWays}. ${deltaInNodesWays < vandalismThreshold ? "This is suspicious!" : ""}
-All added tags minus deleted tags: ${deltaInTags}. ${deltaInTags < vandalismThreshold ? "This is suspicious!" : ""}
-${usedEditorWasId ? `All resolved iD warnings minus new iD warnings: ${deltaInIdWarningsAndResolves}. ${deltaInIdWarningsAndResolves < vandalismThreshold ? "This is suspicious!" : ""}` : ""}
+                titleText = `
+This changeset is potentially destructive!
+All added nodes/ways - All deleted nodes/ways: ${deltaInNodesWays}. ${deltaInNodesWays < vandalismThreshold ? "This is suspicious!" : ""}
+All added tags - All deleted tags: ${deltaInTags}. ${deltaInTags < vandalismThreshold ? "This is suspicious!" : ""}
+${usedEditorWasId ? `All resolved iD warnings - New iD warnings: ${deltaInIdWarningsAndResolves}. ${deltaInIdWarningsAndResolves < vandalismThreshold ? "This is suspicious!" : ""}` : ""}
 
 Reminder: It is often NOT necessary to delete elements in OSM. For example a closed shop should be tagged as 'disused:shop'. One day a new shop might open at the same exact lot and the tags can be updated. The same is true for demolished buildings ('demolished:building')
 `
             } else {
-                titleText = `This changeset looks good!
-All added nodes/ways minus - deleted nodes/ways: ${deltaInNodesWays}. ${deltaInNodesWays < vandalismThreshold ? "This is suspicious!" : ""}
-All added tags minus deleted tags: ${deltaInTags}. ${deltaInTags < vandalismThreshold ? "This is suspicious!" : ""}
-${usedEditorWasId ? `All resolved iD warnings minus new iD warnings: ${deltaInIdWarningsAndResolves}. ${deltaInIdWarningsAndResolves < vandalismThreshold ? "This is suspicious!" : ""}` : ""}
+                titleText = `
+This changeset looks good!
+All added nodes/ways - All deleted nodes/ways: ${deltaInNodesWays}. ${deltaInNodesWays < vandalismThreshold ? "This is suspicious!" : ""}
+All added tags - All deleted tags: ${deltaInTags}. ${deltaInTags < vandalismThreshold ? "This is suspicious!" : ""}
+${usedEditorWasId ? `All resolved iD warnings - New iD warnings: ${deltaInIdWarningsAndResolves}. ${deltaInIdWarningsAndResolves < vandalismThreshold ? "This is suspicious!" : ""}` : ""}
 `
             }
             return titleText;
