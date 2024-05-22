@@ -1,5 +1,9 @@
 //Instantiate map
 let map = L.map('map', {
+    //Canvas renderer added to create wider selection area. Useful especially on touch devices.
+    renderer: L.canvas({
+        tolerance: 10
+    }),
     gestureHandling: activateGestureHandling(),
     contextmenu: true,
     contextmenuWidth: 150,
