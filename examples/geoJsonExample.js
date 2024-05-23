@@ -1,3 +1,4 @@
+//Example of the GeoJSON code created by site.js. newGeoJSON and oldGeoJSON are displayed with leaflet.js
 const newGeoJSON = {
   "type": "FeatureCollection",
   "features": [
