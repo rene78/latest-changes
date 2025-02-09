@@ -314,10 +314,12 @@ function run() {
             //Clear old GeoJSON data from map
             leafletGeoJsonObject && map.removeLayer(leafletGeoJsonObject);
 
-            //Create new GeoJSON layer, fill it with features of downloaded OSM data and add it to the map
+            //Create new GeoJSON layer, fill it with sorted features of downloaded OSM data and add it to the map
             leafletGeoJsonObject = new L.GeoJSON({
                 type: 'FeatureCollection',
-                features: [].concat(oldGeojson.features).concat(newGeojson.features)
+                features: [].concat(oldGeojson.features)
+                    .concat(newGeojson.features)
+                    .sort(sortGeoJsonFeatures)
             }, {
                 style: setStyle,
                 pointToLayer: function (feature, latlng) {
@@ -326,6 +328,66 @@ function run() {
                 onEachFeature: onEachFeature
             }).addTo(map);
 
+            /* Sort GeoJSON features by geometry type and size.
+            By doing this we can make sure that an element which is completely covered by a larger polygon can still be selected.
+
+            Sort order (i.e. order in which they are added to the map):
+            1. Polygons (largest to smallest)
+            2. Lines
+            3. Points
+            
+            Background:
+            GeoJSON features that are added later to the map are always on top of elements that are added earlier.
+            */
+            function sortGeoJsonFeatures(a, b) {
+                const typeOrder = { 'Polygon': 1, 'MultiPolygon': 1, 'LineString': 2, 'Point': 3 };
+                const aType = a.geometry.type;
+                const bType = b.geometry.type;
+
+                // First sort by geometry type
+                if (typeOrder[aType] !== typeOrder[bType]) {
+                    return typeOrder[aType] - typeOrder[bType];
+                }
+
+                // Then sort polygons by area (largest first)
+                if (aType === 'Polygon' || aType === 'MultiPolygon') {
+                    const aArea = calculateArea(a.geometry);
+                    const bArea = calculateArea(b.geometry);
+                    return bArea - aArea; // Reverse the subtraction for descending order
+                }
+
+                return 0;
+            };
+
+            //Check if Polygon or Multipolygon can actually be removed because no Multipolygons in dataset.
+            function calculateArea(geometry) {
+                if (geometry.type === 'Polygon') {
+                    return polygonArea(geometry.coordinates[0]);
+                }
+                if (geometry.type === 'MultiPolygon') {
+                    return geometry.coordinates.reduce((acc, polygon) =>
+                        acc + polygonArea(polygon[0]), 0);
+                }
+                return 0;
+            };
+
+            /*Calculate relative area of polygon.
+            This so called 'Shoelace formula' does not return accurate results in m² because it only works for planar
+            2D coordinates. Our geo coordinates are on a sphere though (in degrees). Since we only want to compare
+            the relative size of each polygon for sorting purposes the formula is sufficient.*/
+            function polygonArea(coords) {
+                let area = 0;
+                for (let i = 0; i < coords.length; i++) {
+                    const j = (i + 1) % coords.length; //j is always x+1 except on the last element of the array where it is 0.
+                    const [xi, yi] = coords[i];
+                    const [xj, yj] = coords[j];
+                    area += xi * yj - xj * yi;
+                }
+
+                return Math.abs(area) / 2;
+            };
+
+            //Define style of GeoJSON elements
             function setStyle(f) {
                 return {
                     color: defineColor(new Date(f.properties.meta.timestamp)),
@@ -339,7 +401,7 @@ function run() {
                 // console.log(feature);
                 // console.log(layer);
 
-                //Increase line weight when feature gets focus
+                //Increase line weight when feature gets focus. Also highlight twin element if feature has been moved
                 layer.on('mouseover', function (e) {
                     // console.log(layer);
                     layer.setStyle({ weight: 6 }); //increase line weight of hovered layer
