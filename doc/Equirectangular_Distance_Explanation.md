@@ -89,3 +89,7 @@ return R * d;
 - **Distance:** Calculated using the Pythagorean theorem and scaled by the Earth's radius.
 
 This method offers a good trade-off between simplicity and accuracy for short distances, making it suitable for many applications in geospatial analysis.
+
+## Credit
+
+This formula has been found on the website [Movable Type](http://www.movable-type.co.uk/scripts/latlong.html#equirectangular). Thanks Chris Veness!
