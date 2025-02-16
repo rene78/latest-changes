@@ -439,38 +439,15 @@ function run() {
                         //All other elements (i.e. lines and polygons): Highlight twin element if the geometry has been changed.
                         //A way to check if a line or polygon has been changed is to compare the length of new and old element.
                         //If there is a difference the element has been changed. Solution below is from https://github.com/tyrasd/geojson-length.
-                        //This can be computationally demanding on complex LineStrings and polgyons. Thus simply highlight all
-                        //twin elements - regardless of whether the geometry has been changed or not - if node count is greater than 50.
                         else if (xmlElements[0].tagName === "way") {
                             // console.log(layer);
 
                             const leafletLayerOfTwin = findLeafletLayerOfTwin(idOfHoveredElement, leafletIdOfHoveredElement);
                             // console.log('leafletLayerOfTwin: ' + leafletLayerOfTwin);
 
-                            //Check if node count of line/polygon is greater than 50. if yes just highlight twin without measuring
-                            const nNodes = xmlElements[0].getElementsByTagName('nd').length;
-                            // console.log(nNodes);
-                            if (nNodes > 50) {
-                                // console.log('Node count is large (>50). So skip the length comparison and highlight twin geometry no matter if there is a length difference or not.');
-                                highlightTwinElementLocation(layer, leafletLayerOfTwin);
-                                return;
-                            };
-
-                            //Get length of hovered element
-                            const lengthOfHoveredElement = calculateLengthOfLineOrPolygon(layer.feature.geometry);
-                            // console.log('lengthOfHoveredElement: ' + lengthOfHoveredElement);
-
-                            //Get length of twin element
-                            const lengthOfTwinElement = calculateLengthOfLineOrPolygon(leafletLayerOfTwin.feature.geometry);
-                            // console.log('lengthOfTwinElement: ' + lengthOfTwinElement);
-
-                            //Compare the two. First round to full meters
-                            // console.log('lengthOfHoveredElement (rounded): ' + +lengthOfHoveredElement.toFixed(1));
-
-                            if (+lengthOfHoveredElement.toFixed(1) !== +lengthOfTwinElement.toFixed(1)) {
-                                // console.log('The elements have different lengths, thus the geometry most probably got changed. Highlight the twin elemnt.');
-                                highlightTwinElementLocation(layer, leafletLayerOfTwin);
-                            }
+                            //Compare length and position of hovered and twin element.
+                            const geometryIsDifferent = checkIfLengthOfLineOrPolygonHasChanged(layer, leafletLayerOfTwin);
+                            if (geometryIsDifferent) highlightTwinElementLocation(layer, leafletLayerOfTwin);
                         }
                     }
                 });
@@ -495,24 +472,66 @@ function run() {
                 return leafletLayerOfTwin;
             }
 
-            //Calculate length of LineString or polygon. Needed to compare 2 LineStrings or polygons to see if they have different lengths
-            function calculateLengthOfLineOrPolygon(geometry) {
-                // console.log(geometry);
-                if (geometry.type === 'LineString')
-                    return calculateLength(geometry.coordinates);
-                else if (geometry.type === 'MultiLineString' || geometry.type === 'Polygon')
-                    return geometry.coordinates.reduce(function (memo, coordinates) {
-                        return memo + calculateLength(coordinates);
-                    }, 0);
-                else
-                    return null;
+            //Compare length and position of hovered and twin element.
+            //return true: Geometry has been changed
+            //return false: Geometry is unchanged
+            function checkIfLengthOfLineOrPolygonHasChanged(leafletLayerOfHoveredElement, leafletLayerOfTwin) {
+                /*
+                //The length check can be computationally demanding on complex LineStrings and polgyons. Thus simply highlight all
+                //twin elements - regardless of whether the geometry has been changed or not - if node count is greater than 50.
+                //Check if node count of line/polygon is greater than 50. if yes just highlight twin without measuring
+                const nNodes = xmlElements[0].getElementsByTagName('nd').length;
+                // console.log(nNodes);
+                if (nNodes > 50) {
+                    // console.log('Node count is large (>50). So skip the length comparison and highlight twin geometry no matter if there is a length difference or not.');
+                    highlightTwinElementLocation(layer, leafletLayerOfTwin);
+                    return;
+                };
+                */
 
+                //Helper function to check whether geometry is a LineString or Polygon
+                const getCoordinates = layer =>
+                    layer.feature.geometry.type === 'LineString'
+                        ? layer.feature.geometry.coordinates
+                        : layer.feature.geometry.coordinates[0];
+
+                //Calculate length of both elements
+                const coordinatesOfHoveredElement = getCoordinates(leafletLayerOfHoveredElement);
+                // console.log(coordinatesOfHoveredElement);
+                const coordinatesOfTwinElement = getCoordinates(leafletLayerOfTwin);
+                // console.log(coordinatesOfTwinElement);
+
+                //Do a first quick check of the first coordinate. If the first coordinate of hovered and twin element is more than 1m apart:
+                //Highlight twin element.
+                // console.log(`Distance between first nodes: ${distance(coordinatesOfHoveredElement[0][0], coordinatesOfHoveredElement[0][1], coordinatesOfTwinElement[0][0], coordinatesOfTwinElement[0][1])}`);
+                if (distance(coordinatesOfHoveredElement[0][0], coordinatesOfHoveredElement[0][1], coordinatesOfTwinElement[0][0], coordinatesOfTwinElement[0][1]) > 1) return true;
+
+                //If they are identical do a more thorough length comparison.
+                //Get length of hovered element
+                const lengthOfHoveredElement = calculateLength(coordinatesOfHoveredElement);
+                // console.log('lengthOfHoveredElement: ' + lengthOfHoveredElement);
+
+                //Get length of twin element
+                const lengthOfTwinElement = calculateLength(coordinatesOfTwinElement);
+                // console.log('lengthOfTwinElement: ' + lengthOfTwinElement);
+
+                //Compare the two. First round to 0.1 meters. If length is different: Highlight twin element.
+                // console.log('lengthOfHoveredElement (rounded): ' + +lengthOfHoveredElement.toFixed(1));
+                if (+lengthOfHoveredElement.toFixed(1) !== +lengthOfTwinElement.toFixed(1)) {
+                    // console.log('The elements have different lengths, thus the geometry most probably got changed. Highlight the twin element.');
+                    return true;
+                }
+
+                //Else it can be assumed that the geometry is unchanged. Do not highlight twin element.
+                else return false;
+
+                //Calculate length of LineString or polygon. Needed to compare 2 LineStrings or polygons to see if they have different lengths
                 function calculateLength(lineString) {
                     // console.log(lineString);
                     if (lineString.length < 2)
                         return 0;
-                    var result = 0;
-                    for (var i = 1; i < lineString.length; i++) {
+                    let result = 0;
+                    for (let i = 1; i < lineString.length; i++) {
                         // console.log(result);
                         result += distance(lineString[i - 1][0], lineString[i - 1][1],
                             lineString[i][0], lineString[i][1]);
@@ -522,7 +541,7 @@ function run() {
 
                 /**
                  * Calculate the approximate distance between two coordinates (lat/lon)
-                 *
+                 * Further explanation see /doc/Equirectangular_Distance_Explanation.md
                  * © Chris Veness, MIT-licensed,
                  * http://www.movable-type.co.uk/scripts/latlong.html#equirectangular
                  */
