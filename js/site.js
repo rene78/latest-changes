@@ -337,7 +337,8 @@ function run() {
             3. Points
             
             Background:
-            GeoJSON features that are added later to the map are always on top of elements that are added earlier.
+            GeoJSON features that are added later to the map are always on top of elements that are added earlier. So if we first
+            add large polygons and only afterwards the smaller ones everything should be selectable. 
             */
             function sortGeoJsonFeatures(a, b) {
                 const typeOrder = { 'Polygon': 1, 'MultiPolygon': 1, 'LineString': 2, 'Point': 3 };
@@ -398,8 +399,10 @@ function run() {
 
             //Define what happens when hovering over each polygon/way/marker
             function onEachFeature(feature, layer) {
-                // console.log(feature);
-                // console.log(layer);
+                // Assign a unique layer ID to each Leaflet layer using the OSM feature ID, appended with 'o' for old features and 'n' for new ones.
+                const OsmIdOfHoveredElement = feature.properties.id;//OSM element ID
+                const isOld = feature.properties.__is_old__;
+                layer._leaflet_id = OsmIdOfHoveredElement + (isOld ? 'o' : 'n');
 
                 //Increase line weight when feature gets focus. Also highlight twin element if feature has been moved
                 layer.on('mouseover', function (e) {
@@ -407,16 +410,13 @@ function run() {
                     layer.setStyle({ weight: 6 }); //increase line weight of hovered layer
                     //Now we check if the hovered element got modified (i.e. not deleted nor created).
                     //Write both XML nodes of old and new element into variable "xmlElements"
-                    const xmlElements = data.querySelectorAll('[id="' + layer.feature.properties.id + '"]');
+                    const xmlElements = data.querySelectorAll('[id="' + OsmIdOfHoveredElement + '"]');
                     // console.log(xmlElements);
                     const action = xmlElements[0].parentNode.parentNode.getAttribute('type');
                     // console.log(action);
                     //Check if action is 'modify'. If yes: Highlight non-hovered twin element of nodes, lines and polygons as well. Skip unmoved elements.
                     if (action === 'modify') {
                         // console.log('Modify! Highlight non-hovered twin element as well (i.e. old or new version). If the element is a node: Only highlight twin element if node has been moved');
-                        const idOfHoveredElement = layer.feature.properties.id;//OSM element ID
-                        const leafletIdOfHoveredElement = leafletGeoJsonObject.getLayerId(layer);//Internal Leaflet layer ID
-                        //console.log('idofhoveredelement: ' + idOfHoveredElement + ' leafletIdOfHoveredElement: ' + leafletIdOfHoveredElement);
 
                         //First check if element is a node. If it is: Check if coordinates have changed. If yes: Highlight twin node. If no: stop function execution (no need to traverse layer object and waste resources)
                         if (xmlElements[0].tagName === "node") {
@@ -427,8 +427,9 @@ function run() {
                             const lonEl1 = xmlElements[1].getAttribute('lon');
                             if (latEl0 !== latEl1 || lonEl0 !== lonEl1) {
                                 // console.log('Coordinates of old and new node are NOT identical --> node has been moved! Highlight twin element.');
-                                const leafletLayerOfTwin = findLeafletLayerOfTwin(idOfHoveredElement, leafletIdOfHoveredElement);
-                                // console.log('leafletLayerOfTwin: ' + leafletLayerOfTwin);
+                                // Get the Leaflet layer of the twin element. It shares the same ID number but has the opposite suffix from the hovered element.
+                                const leafletLayerOfTwin = leafletGeoJsonObject.getLayer(OsmIdOfHoveredElement + (isOld ? 'n' : 'o'));
+
                                 if (!leafletLayerOfTwin) {
                                     // console.log('Twin element is not available. This usually means that 1. The node is part of way 2. The old version of the node had no tags. "osmtogeojson" will NOT convert those nodes into GeoJSON');
                                     return;
@@ -440,10 +441,9 @@ function run() {
                         //A way to check if a line or polygon has been changed is to compare the length of new and old element.
                         //If there is a difference the element has been changed. Solution below is from https://github.com/tyrasd/geojson-length.
                         else if (xmlElements[0].tagName === "way") {
-                            // console.log(layer);
-
-                            const leafletLayerOfTwin = findLeafletLayerOfTwin(idOfHoveredElement, leafletIdOfHoveredElement);
-                            // console.log('leafletLayerOfTwin: ' + leafletLayerOfTwin);
+                            // Get the Leaflet layer of the twin element. It shares the same ID number but has the opposite suffix from the hovered element.
+                            const leafletLayerOfTwin = leafletGeoJsonObject.getLayer(OsmIdOfHoveredElement + (isOld ? 'n' : 'o'));
+                            // console.log('Name of leafletLayerOfTwin: ' + OsmIdOfHoveredElement + (isOld ? 'n' : 'o'));
 
                             //Compare length and position of hovered and twin element.
                             const geometryIsDifferent = checkIfLengthOfLineOrPolygonHasChanged(layer, leafletLayerOfTwin);
@@ -457,19 +457,6 @@ function run() {
                     // leafletGeoJsonObject.resetStyle();
                     layer.setStyle({ weight: 3 });
                 });
-            }
-
-            //Find and return the Leaflet layer of the non-hovered twin element
-            function findLeafletLayerOfTwin(idOfHoveredElement, leafletIdOfHoveredElement,) {
-                let leafletLayerOfTwin;
-                leafletGeoJsonObject.eachLayer(function (l) {
-                    if (l.feature.properties.id === idOfHoveredElement && leafletGeoJsonObject.getLayerId(l) !== leafletIdOfHoveredElement) {
-                        // console.log('leafletGeoJsonObject.getLayerId(l): ' + leafletGeoJsonObject.getLayerId(l));
-                        const leafletIdOfTwin = leafletGeoJsonObject.getLayerId(l);
-                        leafletLayerOfTwin = leafletGeoJsonObject.getLayer(leafletIdOfTwin);
-                    }
-                });
-                return leafletLayerOfTwin;
             }
 
             //Compare length and position of hovered and twin element.
@@ -489,7 +476,7 @@ function run() {
                 };
                 */
 
-                //Helper function to check whether geometry is a LineString or Polygon
+                //Helper function to determine if the geometry is a LineString or Polygon and return the appropriate coordinate path.
                 const getCoordinates = layer =>
                     layer.feature.geometry.type === 'LineString'
                         ? layer.feature.geometry.coordinates
@@ -502,7 +489,7 @@ function run() {
                 // console.log(coordinatesOfTwinElement);
 
                 //Do a first quick check of the first coordinate. If the first coordinate of hovered and twin element is more than 1m apart:
-                //Highlight twin element.
+                //Highlight twin element. Note: This quick check produces false positives for ways with reversed direction.
                 // console.log(`Distance between first nodes: ${distance(coordinatesOfHoveredElement[0][0], coordinatesOfHoveredElement[0][1], coordinatesOfTwinElement[0][0], coordinatesOfTwinElement[0][1])}`);
                 if (distance(coordinatesOfHoveredElement[0][0], coordinatesOfHoveredElement[0][1], coordinatesOfTwinElement[0][0], coordinatesOfTwinElement[0][1]) > 1) return true;
 
