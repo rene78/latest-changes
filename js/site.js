@@ -1071,7 +1071,7 @@ ${usedEditorWasId ? `All resolved iD warnings - New iD warnings: ${deltaInIdWarn
         // console.log(d.user.length);
         const characterLimit = 12;
         if (screen.width > 600) {
-            return d.user.length < characterLimit ? d.user : d.user.slice(0, characterLimit) + '..';
+            return d.user.length <= characterLimit ? d.user : d.user.slice(0, characterLimit) + '..';
         } else return d.user;
     })
         .attr('title', function (d) {
