@@ -1061,15 +1061,22 @@ ${usedEditorWasId ? `All resolved iD warnings - New iD warnings: ${deltaInIdWarn
             return (possibleVandalism ? "red" : "gray");
         });
 
-    //Text bubble span where symbol is inserted in case of comments for this changeset
+    //Adds a span element for displaying a text bubble SVG symbol if this OSM changeset has received comments
     rl.append('span')
         .classed('text-bubble', true);
 
-    //User name
+    //User name. Truncate the string on screen widths larger 600px if the character limit is exceeded.
+    //On small screens return the whole user name since the changesets table takes up the whole width anyway - enough space.
     rl.append('a').html(function (d) {
-        return d.user;
+        // console.log(d.user.length);
+        const characterLimit = 12;
+        if (screen.width > 600) {
+            return d.user.length < characterLimit ? d.user : d.user.slice(0, characterLimit) + '..';
+        } else return d.user;
     })
-        .attr('title', 'Go to OSM user page')
+        .attr('title', function (d) {
+            return 'Go to OSM user page of ' + d.user;
+        })
         .attr('target', '_blank')
         .attr('href', function (d) {
             return '//openstreetmap.org/user/' + d.user;
