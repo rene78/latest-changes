@@ -1065,21 +1065,23 @@ ${usedEditorWasId ? `All resolved iD warnings - New iD warnings: ${deltaInIdWarn
     rl.append('span')
         .classed('text-bubble', true);
 
-    //User name. Truncate the string on screen widths larger 600px if the character limit is exceeded.
-    //On small screens return the whole user name since the changesets table takes up the whole width anyway - enough space.
-    rl.append('a').html(function (d) {
-        // console.log(d.user.length);
-        const characterLimit = 12;
-        if (screen.width > 600) {
-            return d.user.length <= characterLimit ? d.user : d.user.slice(0, characterLimit) + '..';
-        } else return d.user;
-    })
+    //User name.
+    rl.append('a')
+        .classed('user-name', true)
+        .html(function (d) {
+            // console.log(d.user);
+            return d.user;
+        })
         .attr('title', function (d) {
-            return 'Go to OSM user page of ' + d.user;
+            //Get unaltered user name from changesets object. The value in d.user might have html in it if filtered,
+            // e.g. <span class="highlight">rene</span>78. We don't want that in the title and href.
+            const userName = changesets[d.id].user;
+            return 'Go to OSM user page of ' + userName;
         })
         .attr('target', '_blank')
         .attr('href', function (d) {
-            return '//openstreetmap.org/user/' + d.user;
+            const userName = changesets[d.id].user;//Get unaltered user name from changesets object.
+            return '//openstreetmap.org/user/' + userName;
         });
 
     //Timespan since changeset creation

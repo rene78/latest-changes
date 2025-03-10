@@ -282,6 +282,20 @@ a:visited {
   margin-right: 2px;
 }
 
+/*In order to avoid that 'user name' and 'time since creation' jumps to a second line the
+user name is truncated if it takes up more than 110px. Only on large screens since the
+changesets list gets the whole width on small screens*/
+@media (min-width: 601px) {
+  .user-name {
+    overflow: hidden;
+    display: inline-block;
+    max-width: 105px;
+    text-overflow: ellipsis;
+    vertical-align: bottom;
+    white-space: nowrap;
+  }
+}
+
 .changeset {
   /* padding: 0px 0px 5px 20px; */
   height: 35px;
