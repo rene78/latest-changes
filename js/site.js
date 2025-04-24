@@ -139,7 +139,7 @@ if (resolutionFromLocalStorage) {
 
 //Calculate point in time from where to start analysis
 function calculateAnalysisStartTime() {
-    const analysisStartTime = (new Date(new Date() - 1000 * 60 * 60 * 24 * daysToShow)).toISOString();
+    const analysisStartTime = (new Date(new Date() - 1000 * 60 * 60 * 24 * daysToShow));
     // console.log(analysisStartTime);
     return analysisStartTime;
 }
@@ -157,6 +157,7 @@ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
 
 //Update map display on zoom and page load
 function updateMap() {
+    // console.log('updatemap called');
     const mapHtml = document.querySelector("#map");
     const currentZoomLevel = map.getZoom();
     const button = document.getElementById('download-changesets-button');
@@ -179,20 +180,68 @@ function updateMap() {
     }
 }
 
-//Return color depending on age of changeset. New: bright red, old: dark red/gray
+/**
+* Linearly interpolates between two colors based on a factor.
+* @param {string} rgb1 - Start rgb color string.
+* @param {string} rgb2 - End rgb color string.
+* @param {number} factor - Interpolation factor (0.0 to 1.0). 0 = color1, 1 = color2.
+* @returns {string} - Interpolated rgb color string.
+*/
+function interpolateColor(rgb1, rgb2, factor) {
+    // get r, g, b values as numbers
+    const [rgb1R, rgb1G, rgb1B] = rgb1.match(/\d+/g).map(Number);
+    const [rgb2R, rgb2G, rgb2B] = rgb2.match(/\d+/g).map(Number);
+
+    const r = rgb1R + (rgb2R - rgb1R) * factor;
+    const g = rgb1G + (rgb2G - rgb1G) * factor;
+    const b = rgb1B + (rgb2B - rgb1B) * factor;
+
+    // console.log(`rgb(${r},${g},${b})`);
+    return `rgb(${r},${g},${b})`;
+}
+
+// Return color depending on age of changeset. New: bright red, old: dark red/gray
 function defineColor(date) {
-    /*The datescale function expects a date that is between Now and 1 (or 3, 7, 30) days in the past.
-    Depending on how close the date is to Now it returns a number closer to 1.
-    Example: NOW is 2022-11-14, 14:30. The range is 7 days)
-    const number = datescale(new Date(2022,10,13) //number = 0.7705556*/
-    const datescale = d3.time.scale()
-        .domain([new Date(calculateAnalysisStartTime()), new Date()])
-        .range([0, 1]);
-    /*The colint function interpolates between gray (value 0) and red (value 1)
-    colint(0) equals gray (#777777)
-    colint(1) equals red (#ff0000)*/
-    const colint = d3.interpolateRgb('#777', '#f00');
-    return colint(datescale(date))
+    // Ensure input 'date' is a Date object
+    if (!(date instanceof Date)) {
+        date = new Date(date); // Attempt to convert if not already a Date
+        if (isNaN(date)) { // Check if conversion failed
+            console.error("Invalid date passed to defineColor:", date);
+            return '#777777'; // Return default gray on error
+        }
+    }
+
+    const colorOldest = 'rgb(119, 119, 119)'; // Gray for oldest
+    const colorNewest = 'rgb(255, 0, 0)';   // Red for newest
+
+    const startDate = calculateAnalysisStartTime(); // Calculate analysis start date
+    // console.log(startDate);
+    const endDate = new Date(); // Now
+
+    // Get timestamps (milliseconds)
+    const startTimestamp = startDate.getTime();
+    const endTimestamp = endDate.getTime();
+    const changesetTimestamp = date.getTime();
+
+    // Calculate total duration of the time window
+    const totalDuration = endTimestamp - startTimestamp;
+
+    // Handle edge case where start and end times are the same (or invalid)
+    if (totalDuration <= 0) {
+        return colorNewest; // If no duration, default to newest color
+    }
+
+    // Calculate how far the input date is into the duration
+    const elapsedTime = changesetTimestamp - startTimestamp;
+
+    // Calculate the proportion (0 to 1)
+    let proportion = elapsedTime / totalDuration;
+
+    // Clamp the proportion to be strictly between 0 and 1
+    proportion = Math.max(0, Math.min(1, proportion));
+
+    // Interpolate the color based on the proportion
+    return interpolateColor(colorOldest, colorNewest, proportion);
 }
 
 //Toggle display of loading animation and appearance of download button
@@ -206,14 +255,16 @@ function toggleWaitingScreen() {
     button.disabled = (button.disabled) ? button.disabled = "" : button.disabled = "disabled";//Toggle button disable
 }
 
-//On page load: Check if map is zoomed in enough. If yes: Download OSM changeset data from overpass via XHR request
+//On page load: Check if map is zoomed in enough. If yes: Download OSM changeset data from overpass
 const overpass_server = '//overpass-api.de/api/'; //'https://overpass.kumi.systems/api/';
 const vandalismThreshold = -3; //If 3 more elements or tags have been deleted than added, the traffic light will change to red
-let xhr;
 let leafletGeoJsonObject = null; //All the GeoJSON data will go into this variable
 const debugMode = false; //False (default): Do an API call to Overpass. True: Use locally saved xml files for debugging purposes
 
-//Check if map is zoomed in enough
+// Reset AbortController to null during load of script. Needed to reset all Promise requests.
+window.currentAbortController = null;
+
+//Check if map is zoomed in enough (only executed on initial page load)
 const isMapZoomedInEnough = updateMap();
 if (isMapZoomedInEnough) run();
 
@@ -224,15 +275,26 @@ let changesets = {};
 function run() {
     d3.select('#map').classed('faded', true);//Map displayed greyish (Cannot go into "toggleWaitingScreen()" because we want to keep the map greyed out in case of unsuccessful overpass query)
     document.querySelector(".filter-container").classList.add("hide");//Hide filter changesets toolbar until load of changesets has been completed successfully
-    toggleWaitingScreen();
-    if (xhr) xhr.abort();
+    toggleWaitingScreen();//Show loading animation and make download button unavailable
+
+    // 1. Abort previous request if it exists
+    if (window.currentAbortController) {
+        window.currentAbortController.abort();
+        console.log("Previous request aborted.");
+    }
+
+    // 2. Create a NEW controller for THIS run
+    window.currentAbortController = new AbortController();
+    const signal = window.currentAbortController.signal; // Get the signal for this run
+
+    // Get current extension of displayed leaflet map
     const bounds = map.getBounds();
     const bbox = bounds.getSouthWest().lat + ',' +
         bounds.getSouthWest().wrap().lng + ',' +
         bounds.getNorthEast().lat + ',' +
         bounds.getNorthEast().wrap().lng;
     // const overpass_query = '[adiff:"' + calculateAnalysisStartTime() + '"][bbox:' + bbox + '][out:xml][timeout:22];way->.ways;(.ways>;node;);out meta;.ways out geom meta;';//This query sometimes only returned nodes. Thus replaced with query below
-    const overpass_query = '[adiff:"' + calculateAnalysisStartTime() + '"][bbox:' + bbox + '][out:xml];nw;out geom meta;';
+    const overpass_query = '[adiff:"' + calculateAnalysisStartTime().toISOString() + '"][bbox:' + bbox + '][out:xml];nw;out geom meta;';
     // console.log(overpass_server + 'interpreter?data=' + overpass_query);
 
     //Either do an API call to Overpass or use a locally saved xml file for debugging purposes
@@ -240,20 +302,28 @@ function run() {
     if (debugMode) xmlDataLocation = "./examples/exampleOverpassAPI.xml"; //Load example xml for debugging purposes. Works offline
     else xmlDataLocation = overpass_server + 'interpreter?data=' + overpass_query; //API call to overpass
 
-    xhr = d3.xml(xmlDataLocation
-    ).on("error", function (error) {
-        toggleWaitingScreen();
-        message("alarm", "Server error: " + error.statusText); //Error message in case of no results from Overpass
-    })
-        .on('load', function (data) {
-            // console.log(data);
+    let allOverpassXMLDataElements;
+    fetch(xmlDataLocation, { signal: signal })//start fetch, return Promise. Pass signal for abort controlling.
+        .then(response => {
+            if (!response.ok) { // Check if the HTTP request was successful
+                throw new Error(`HTTP error fetching Overpass data! Status: ${response.status} ${response.statusText || ''}`);
+            }
+            return response.text(); // Get the response body as text (returns a Promise)
+        })
+        .then(text => new window.DOMParser().parseFromString(text, "text/xml")) // Parse the text as XML
+        .then(function (data) { // SUCCESS callback - 'data' is now the parsed XML Document
+            // Check if aborted before processing (already done after fetch, but good to keep)
+            if (signal.aborted) {
+                throw new DOMException('Aborted', 'AbortError');
+            }
+            // console.log('Parsed Overpass XML:', data); // Optional: check the parsed data
             let newData = document.implementation.createDocument(null, 'osm');
             let oldData = document.implementation.createDocument(null, 'osm');
-            const elements = data.querySelectorAll('action');
+            allOverpassXMLDataElements = data.querySelectorAll('action');
             //Separate changed (new) and pre-change (old) OSM map data into respective xml objects
             // console.log(elements);
-            for (let i = 0; i < elements.length; i++) {
-                const element = elements[i];
+            for (let i = 0; i < allOverpassXMLDataElements.length; i++) {
+                const element = allOverpassXMLDataElements[i];
                 // console.log(element);
                 switch (element.getAttribute('type')) {
                     case 'create':
@@ -330,7 +400,7 @@ function run() {
 
             /* Sort GeoJSON features by geometry type and size.
             By doing this we can make sure that an element which is completely covered by a larger polygon can still be selected.
-
+        
             Sort order (i.e. order in which they are added to the map):
             1. Polygons (largest to smallest)
             2. Lines
@@ -791,6 +861,7 @@ function run() {
                 }
             }
 
+            //--- Start of the second async operation: ---
             //Download changeset text and changeset comment count. Once done render changesets list on the left side
             //Write changeset id's in an array. This is used to create URL for API call
             const changesetIds = [];
@@ -801,199 +872,237 @@ function run() {
 
             document.querySelector("#results").innerHTML = "";//Empty old results list (same happens in renderChangeSetsList() "allresults" later on, but because of the API call below the old list in a subsequent call would still be shown for a second while the new GeoJSON data has already been loaded --> confusing UX)
 
-            const queue = d3.queue();
+            const promises = []; // Array to hold promises for changeset details
+            const fetchChangesetBatch = (ids) => {
+                // Use the same abort signal for these requests if desired
+                const url = debugMode
+                    ? "./examples/exampleOSMAPI.xml" // Handle debug mode (only makes one request)
+                    : 'https://api.openstreetmap.org/api/0.6/changesets?changesets=' + ids.join(',');
 
+                //return d3.xml(url, { signal: signal }); // Return the Promise from d3.xml
+
+                // Use fetch, check response, parse XML
+                return fetch(url, { signal: signal }) // Return the promise chain
+                    .then(response => {
+                        if (!response.ok) { // Check if the HTTP request was successful
+                            throw new Error(`HTTP error fetching changeset details! Status: ${response.status} ${response.statusText || ''} URL: ${url}`);
+                        }
+                        return response.text(); // Get the response body as text
+                    })
+                    .then(text => new window.DOMParser().parseFromString(text, "text/xml")); // Parse the text as XML
+            };
             //Load a local example file if debug mode is on. If not call the OSM API.
-            if (debugMode) queue.defer(d3.xml, "./examples/exampleOSMAPI.xml");//load local file
-            else {
+            if (debugMode) {
+                promises.push(fetchChangesetBatch([])); // Pass empty array if URL is fixed
+            } else {
                 //Fetch data from OSM database. If there are more than 100 changesets to query make multiple API requests with a hundred CS each.
                 while (changesetIds.length > 0) {
-                    // console.log('executed');
-                    queue.defer(d3.xml, 'https://api.openstreetmap.org/api/0.6/changesets?changesets=' + changesetIds.splice(0, 100).join(','));//limit queried changesets to 100
+                    promises.push(fetchChangesetBatch(changesetIds.splice(0, 100)));
+                }
+            }
+            // Use Promise.all to wait for all changeset detail requests
+            return Promise.all(promises); // IMPORTANT: Return this promise to chain correctly
+            // --- End of the second async operation ---
+
+        }) // This .then() receives the result of Promise.all(promises)
+        .then(function (xmls) { // SUCCESS callback for the *second* async operation (Promise.all)
+            // Check if aborted before processing results
+            if (signal.aborted) {
+                throw new DOMException('Aborted', 'AbortError');
+            }
+            // 'xmls' is the array of parsed XML documents from the changeset details
+            xmls.forEach(function (xmlDoc) {
+                const css = xmlDoc.getElementsByTagName('changeset');
+                // console.log(css);
+                for (let i = 0; i < css.length; i++) {
+                    const cid = css[i].getAttribute('id');
+                    //Write discussion count to changesets object
+                    changesets[cid].discussionCount = +css[i].getAttribute("comments_count");
+                    //Write changeset comment to changesets object
+                    const commentTag = css[i].querySelector('tag[k="comment"]');
+                    if (commentTag)
+                        changesets[cid].comment = commentTag.getAttribute('v');
+
+                    //Get sum of warnings and resolved iD warnings for each changeset and write the delta into changesets object
+                    // console.log(css[i]);
+                    const tagsWithResolvedIdWarnings = css[i].querySelectorAll('tag[k^="resolved"]');
+                    const nIdResolvedWarnings = getSumOfiDWarningsAndResolvedWarnings(tagsWithResolvedIdWarnings);
+                    const tagsWithIdWarnings = css[i].querySelectorAll('tag[k^="warning"]');
+                    const nIdWarnings = getSumOfiDWarningsAndResolvedWarnings(tagsWithIdWarnings);
+
+                    function getSumOfiDWarningsAndResolvedWarnings(tagsWithResolvedIdWarnings) {
+                        let counter = 0;
+                        tagsWithResolvedIdWarnings.forEach(tag => {
+                            const value = +tag.getAttribute('v');
+                            // console.log(value);
+                            counter += value;
+                        });
+                        return counter;
+                    }
+                    changesets[cid].deltaInIdWarningsAndResolves = nIdResolvedWarnings - nIdWarnings;
+
+                    ////Get name of used OSM editor
+
+                    const osmEditorTag = css[i].querySelector('tag[k="created_by"]');
+                    if (osmEditorTag)
+                        changesets[cid].osmEditor = osmEditorTag.getAttribute('v');
+                }
+            });
+
+            /*Vandalism Checker
+            Simple sanity checker for all the downloaded changesets. 3 things are checked:
+            1. It summarizes the number of all elements which have been added or deleted
+            1. It summarizes the number of all elements which have been added or deleted
+            3. It summarizes the number of all iD warnings and resolved iD warnings
+            for each changeset. If the sum is below a certain treshold (currently -3) then a traffic light changes to red to alert the user
+            about this changeset.*/
+            function vandalismChecker() {
+                // console.log(elements);
+                for (let i = 0; i < allOverpassXMLDataElements.length; i++) {
+                    //Get type, i.e. "create", "modify" or "delete"
+                    const type = allOverpassXMLDataElements[i].getAttribute("type");
+                    // console.log(type);
+
+                    //Get changeset number
+                    let changesetNumber
+                    if (type === "create") changesetNumber = allOverpassXMLDataElements[i].lastElementChild.getAttribute("changeset");
+                    else changesetNumber = allOverpassXMLDataElements[i].lastElementChild.firstElementChild.getAttribute("changeset");
+                    // console.log(changesetNumber);
+
+                    //Check which action is performed
+                    //"Create"
+                    //deltaInNodesWays++
+                    //deltaInTags += nTagsAdded
+                    if (type === "create" && changesets[changesetNumber]) {
+                        //Check the amount of tags that have been added
+                        const nTagsAdded = allOverpassXMLDataElements[i].lastElementChild.querySelectorAll("tag").length;
+                        // console.log(nTagsAdded);
+                        changesets[changesetNumber].deltaInTags += nTagsAdded;
+
+                        //If a node with 0 tags has been created: Do not add it to deltaInNodesWays
+                        //(normally it is just a newly created node of an already existing way)
+
+                        //Get element type (i.e. "node" or "way")
+                        const elementType = allOverpassXMLDataElements[i].firstElementChild.nodeName;
+                        // console.log(elementType);
+
+                        if (elementType === "node" && nTagsAdded == 0) continue;
+                        else changesets[changesetNumber].deltaInNodesWays++;
+                    }
+
+                    // "Modify"
+                    //deltaInNodesWays = unchanged
+                    //deltaInTags += nTagsNew - nTagsOld
+                    if (type === "modify" && changesets[changesetNumber]) {
+                        const nTagsNew = allOverpassXMLDataElements[i].lastElementChild.firstElementChild.querySelectorAll("tag").length;
+                        const nTagsOld = allOverpassXMLDataElements[i].firstElementChild.firstElementChild.querySelectorAll("tag").length;
+                        // console.log(nTagsNew);
+                        // console.log(nTagsOld);
+                        changesets[changesetNumber].deltaInTags += (nTagsNew - nTagsOld);
+                    }
+
+                    // "Delete"
+                    //deltaInNodesWays--
+                    //deltaInTags -= nTags
+                    if (type === "delete" && changesets[changesetNumber]) {
+                        const nTagsDeleted = allOverpassXMLDataElements[i].firstElementChild.querySelectorAll("tag").length;
+                        // console.log(nTagsDeleted);
+                        changesets[changesetNumber].deltaInTags -= nTagsDeleted;
+
+                        //If a node with 0 tags has been deleted: Do not subtract it from deltaInNodesWays
+                        // (normally it is just a newly deleted node of an already existing way)
+
+                        //Get element type (i.e. "node" or "way")
+                        const elementType = allOverpassXMLDataElements[i].firstElementChild.firstElementChild.nodeName;
+                        // console.log(elementType);
+                        //Check the amount of tags before deletion
+                        const nTagsBeforeDeletion = allOverpassXMLDataElements[i].firstElementChild.firstElementChild.querySelectorAll("tag").length;
+                        // console.log(nTagsBeforeDeletion);
+                        if (elementType === "node" && nTagsBeforeDeletion == 0) continue;
+                        else changesets[changesetNumber].deltaInNodesWays--;
+                    }
+                }
+
+                //Write boolean value 'possibleVandalims' into 'changesets'
+                for (const changeset in changesets) {
+                    // console.log(changeset);
+
+                    //Check how many warnings and resolves iD editor produced.
+                    // console.log("Changeset number: " + changeset + ", deltaInIdWarningsAndResolves: " + changesets[changeset].deltaInIdWarningsAndResolves);
+
+                    if ((changesets[changeset].deltaInNodesWays < vandalismThreshold) || (changesets[changeset].deltaInTags < vandalismThreshold) || (changesets[changeset].deltaInIdWarningsAndResolves < vandalismThreshold)) {
+                        changesets[changeset].possibleVandalism = true;
+                    }
                 }
             }
 
-            queue.awaitAll(function (error, xmls) {
-                if (error) return console.error(error);
-                // console.log(xmls);
-                xmls.forEach(function (xml) {
-                    const css = xml.getElementsByTagName('changeset');
-                    // console.log(css);
-                    for (let i = 0; i < css.length; i++) {
-                        const cid = css[i].getAttribute('id');
-                        //Write discussion count to changesets object
-                        changesets[cid].discussionCount = +css[i].getAttribute("comments_count");
-                        //Write changeset comment to changesets object
-                        const commentTag = css[i].querySelector('tag[k="comment"]');
-                        if (commentTag)
-                            changesets[cid].comment = commentTag.getAttribute('v');
-
-                        //Get sum of warnings and resolved iD warnings for each changeset and write the delta into changesets object
-                        // console.log(css[i]);
-                        const tagsWithResolvedIdWarnings = css[i].querySelectorAll('tag[k^="resolved"]');
-                        const nIdResolvedWarnings = getSumOfiDWarningsAndResolvedWarnings(tagsWithResolvedIdWarnings);
-                        const tagsWithIdWarnings = css[i].querySelectorAll('tag[k^="warning"]');
-                        const nIdWarnings = getSumOfiDWarningsAndResolvedWarnings(tagsWithIdWarnings);
-
-                        function getSumOfiDWarningsAndResolvedWarnings(tagsWithResolvedIdWarnings) {
-                            let counter = 0;
-                            tagsWithResolvedIdWarnings.forEach(tag => {
-                                const value = +tag.getAttribute('v');
-                                // console.log(value);
-                                counter += value;
-                            });
-                            return counter;
-                        }
-                        changesets[cid].deltaInIdWarningsAndResolves = nIdResolvedWarnings - nIdWarnings;
-
-                        ////Get name of used OSM editor
-
-                        const osmEditorTag = css[i].querySelector('tag[k="created_by"]');
-                        if (osmEditorTag)
-                            changesets[cid].osmEditor = osmEditorTag.getAttribute('v');
-                    }
-                });
-
-                /*Vandalism Checker
-                Simple sanity checker for all the downloaded changesets. 3 things are checked:
-                1. It summarizes the number of all elements which have been added or deleted
-                1. It summarizes the number of all elements which have been added or deleted
-                3. It summarizes the number of all iD warnings and resolved iD warnings
-                for each changeset. If the sum is below a certain treshold (currently -3) then a traffic light changes to red to alert the user
-                of this changeset.*/
-                function vandalismChecker() {
-                    // console.log(elements);
-                    for (let i = 0; i < elements.length; i++) {
-                        //Get type, i.e. "create", "modify" or "delete"
-                        const type = elements[i].getAttribute("type");
-                        // console.log(type);
-
-                        //Get changeset number
-                        let changesetNumber
-                        if (type === "create") changesetNumber = elements[i].lastElementChild.getAttribute("changeset");
-                        else changesetNumber = elements[i].lastElementChild.firstElementChild.getAttribute("changeset");
-                        // console.log(changesetNumber);
-
-                        //Check which action is performed
-                        //"Create"
-                        //deltaInNodesWays++
-                        //deltaInTags += nTagsAdded
-                        if (type === "create" && changesets[changesetNumber]) {
-                            //Check the amount of tags that have been added
-                            const nTagsAdded = elements[i].lastElementChild.querySelectorAll("tag").length;
-                            // console.log(nTagsAdded);
-                            changesets[changesetNumber].deltaInTags += nTagsAdded;
-
-                            //If a node with 0 tags has been created: Do not add it to deltaInNodesWays
-                            //(normally it is just a newly created node of an already existing way)
-
-                            //Get element type (i.e. "node" or "way")
-                            const elementType = elements[i].firstElementChild.nodeName;
-                            // console.log(elementType);
-
-                            if (elementType === "node" && nTagsAdded == 0) continue;
-                            else changesets[changesetNumber].deltaInNodesWays++;
-                        }
-
-                        // "Modify"
-                        //deltaInNodesWays = unchanged
-                        //deltaInTags += nTagsNew - nTagsOld
-                        if (type === "modify" && changesets[changesetNumber]) {
-                            const nTagsNew = elements[i].lastElementChild.firstElementChild.querySelectorAll("tag").length;
-                            const nTagsOld = elements[i].firstElementChild.firstElementChild.querySelectorAll("tag").length;
-                            // console.log(nTagsNew);
-                            // console.log(nTagsOld);
-                            changesets[changesetNumber].deltaInTags += (nTagsNew - nTagsOld);
-                        }
-
-                        // "Delete"
-                        //deltaInNodesWays--
-                        //deltaInTags -= nTags
-                        if (type === "delete" && changesets[changesetNumber]) {
-                            const nTagsDeleted = elements[i].firstElementChild.querySelectorAll("tag").length;
-                            // console.log(nTagsDeleted);
-                            changesets[changesetNumber].deltaInTags -= nTagsDeleted;
-
-                            //If a node with 0 tags has been deleted: Do not subtract it from deltaInNodesWays
-                            // (normally it is just a newly deleted node of an already existing way)
-
-                            //Get element type (i.e. "node" or "way")
-                            const elementType = elements[i].firstElementChild.firstElementChild.nodeName;
-                            // console.log(elementType);
-                            //Check the amount of tags before deletion
-                            const nTagsBeforeDeletion = elements[i].firstElementChild.firstElementChild.querySelectorAll("tag").length;
-                            // console.log(nTagsBeforeDeletion);
-                            if (elementType === "node" && nTagsBeforeDeletion == 0) continue;
-                            else changesets[changesetNumber].deltaInNodesWays--;
-                        }
-                    }
-
-                    //Write boolean value 'possibleVandalims' into 'changesets'
-                    for (const changeset in changesets) {
-                        // console.log(changeset);
-
-                        //Check how many warnings and resolves iD editor produced.
-                        // console.log("Changeset number: " + changeset + ", deltaInIdWarningsAndResolves: " + changesets[changeset].deltaInIdWarningsAndResolves);
-
-                        if ((changesets[changeset].deltaInNodesWays < vandalismThreshold) || (changesets[changeset].deltaInTags < vandalismThreshold) || (changesets[changeset].deltaInIdWarningsAndResolves < vandalismThreshold)) {
-                            changesets[changeset].possibleVandalism = true;
-                        }
-                    }
+            // console.log(changesets);
+            vandalismChecker();//Analyse each changeset and create boolean "possibleVandalism" within "changesets" object
+            renderChangesetsList(changesets);//Render changesets list on the left side
+        })
+        .catch(function (error) { // ERROR handler for ANY error in the Promise chain above
+            if (error.name === 'AbortError') {
+                console.log("Fetch aborted.");
+                // Don't show a user error for deliberate aborts, just ensure UI is reset
+                // (toggleWaitingScreen might already be handled if the abort happens early)
+                // May need explicit UI reset here depending on state.
+                d3.select('#map').classed('faded', false); // Un-fade map
+                // Ensure loading animation is off if it was turned on
+                const loadingAnimation = document.querySelector("#loading-animation");
+                if (!loadingAnimation.classList.contains("hide")) {
+                    toggleWaitingScreen();
                 }
 
-                // console.log(changesets);
-                vandalismChecker();//Analyse each changeset and create boolean "possibleVandalism" within "changesets" object
-                renderChangesetsList(changesets);//Render changesets list on the left side
-            });
-        }).get();
+            } else {
+                // Handle actual network or processing errors
+                toggleWaitingScreen();
+                console.error("Error fetching or processing data:", error); // Log the actual error
+                message("alarm", "Server error: " + (error.message || "Could not load data."));
+            }
+        })
+        .finally(() => {
+            // Cleanup: Clear the controller reference ONLY if it's the one from this run
+            if (window.currentAbortController && signal === window.currentAbortController.signal) {
+                window.currentAbortController = null;
+                // console.log("AbortController reference cleared.");
+            }
+        });
 }
 
 //Render changesets list on the left side
 function renderChangesetsList(changesetsToDisplay) {
-    const bytime = [];
-    for (const k in changesetsToDisplay) {
-        bytime.push(changesetsToDisplay[k]);
-    }
-    //Sort newest to oldest changeset
-    bytime.sort(function (a, b) {
-        return (+b.time) - (+a.time);
-    });
-    //From here onwards the creation of the changesets section starts
-    const results = d3.select('#results').html("");
-    const allresults = results
-        .selectAll('div.result')
-        .data(bytime, function (d) {
-            return d.id;
-        })
-        .attr('class', 'result')
-        .style('color', function (l) {
-            return defineColor(l.time);
-        });
-    allresults.exit().remove();
+    //Object.values writes all values of 'changesetsToDisplay' object into an array
+    //Then the array elements (i.e. changesets) are sorted newest to oldest
+    const bytime = Object.values(changesetsToDisplay)
+        .sort((a, b) => (+b.time) - (+a.time));
 
+    //From here onwards the creation of the changesets section starts
+    const results = d3.select('#results').html("");//Select and Clear the Results Container
+    const allresults = results
+        .selectAll('div.result')//Since div.results is nonexistent at this point in time D3 creates an empty selection
+        .data(bytime, d => d.id);//Bind data
+    // console.log(allresults);
+    //Below a single changeset div container 'rl' with all its content (e.g. loupe, traffic light, username, ...) is created.
     const rl = allresults.enter()
         .append('div')
         .attr('class', 'result')
         .attr('title', 'Changeset is highlighted on map')
-        .style('color', function (l) {
-            return defineColor(l.time);
-        });
+        .style('color', d => defineColor(d.time))
+        .on('click', click)//Highlight changeset on click (desktop/mobile)
+        .on('mouseover', click);//Highlight changeset on mouseover (desktop)
     // console.log(rl);
     allresults.order();
-
-    rl.on('click', click);//Highlight changeset on click (desktop/mobile)
-    rl.on('mouseover', click);//Highlight changeset on mouseover (desktop)
 
     //"Zoom to changeset" button
     rl.append('div')
         .classed('zoom', true)
         .attr('title', 'Zoom to changeset')
         //.html('&#x1F50E; ')//Unicode glyph for a loupe
-        .on('click', function (d) {
+        .on('click', function (event, d) {
             //Check each layer on the map. If it belongs to clicked changeset --> add it to a featureGroup
             //(featureGroup needed because layers with points only don't have a getBounds function)
-            d3.event.preventDefault();
-            const id = d.id ? d.id : d.feature.feature.properties.meta.changeset;
+            event.preventDefault();
+            const id = d.id;
             const changesetLayers = L.featureGroup();
             leafletGeoJsonObject.eachLayer(function (l) {
                 if (l.feature.properties.meta.changeset == id) l.addTo(changesetLayers);
@@ -1002,7 +1111,6 @@ function renderChangesetsList(changesetsToDisplay) {
             map.fitBounds(changesetLayers.getBounds());
             //On small screens (screen width < 601px) scroll all the way down, so that map is completely visible on screen
             if (screen.width < 601) {
-                let mapContainer = document.querySelector(".map-container");//does not work with map container, thus used "window" in the next line
                 window.scrollTo({
                     top: 2222,
                     behavior: 'smooth'
@@ -1063,7 +1171,14 @@ ${usedEditorWasId ? `All resolved iD warnings - New iD warnings: ${deltaInIdWarn
 
     //Adds a span element for displaying a text bubble SVG symbol if this OSM changeset has received comments
     rl.append('span')
-        .classed('text-bubble', true);
+        .classed('text-bubble', true)
+        .filter(d => d.discussionCount > 0) // Filter this selection of spans based on their data
+        // Now, only operate on the spans that passed the filter:
+        .attr('title', d => `Changeset has ${d.discussionCount} comment${d.discussionCount !== 1 ? "s" : ""}`)
+        .append('svg') // Append SVG only to filtered spans
+        .classed('text-bubble-svg', true)
+        .append('use')
+        .attr('href', 'img/icons.svg#speech-bubble');
 
     //User name.
     rl.append('a')
@@ -1093,45 +1208,37 @@ ${usedEditorWasId ? `All resolved iD warnings - New iD warnings: ${deltaInIdWarn
             return moment(d.time).fromNow();
         });
 
-    //Changeset text and changeset comment count (were downloaded separately from OSM API)
-    rl.append('div').attr('class', 'changeset');
-    rl.select('span.text-bubble').each(function (d) {
-        if (d.discussionCount > 0) {
-            // d3.select(this).html('&#128489; ');//Speech bubble glyphicon (doesn't work on Android, thus changed to SVG)
-            d3.select(this).attr('title', `Changeset has ${d.discussionCount} comment${d.discussionCount !== 1 ? "s" : ""}`);
-            d3.select(this).append('svg')
-                .classed('text-bubble-svg', true)
-                .append('use')
-                .attr('href', 'img/icons.svg#speech-bubble');
-        }
-    });
-
-    rl.select('div.changeset').each(function (d) {
-        d3.select(this).html(
-            '<a href="https://openstreetmap.org/browse/changeset/' + d.id + '" target="_blank" class="comment" title="Go to OSM changeset page">' +
-            (d.comment || '<span class="no-comment">&mdash;</span>') +
-            '</a>'
-        );
-    });
+    //Changeset text (was downloaded separately from OSM API)
+    rl.append('div')
+        .classed('changeset', true)
+        .html(function (d) {
+            return `<a href="https://openstreetmap.org/browse/changeset/${d.id}" target="_blank" class="comment" title="Go to OSM changeset page">${d.comment || '<span class="no-comment">—</span>'}</a>`;
+        })
 }
 
 //Highlight clicked layer on map and in sidebar (happens when selecting element in sidebar or on map)
-function click(d) {
-    // console.log(d);
+function click(event, d) {
+    // console.log("--- click Function Called ---");
+    // console.log("Argument 1 (event):", event); // This will be MouseEvent on sidebar hover and when clicking on leaflet element
+    // console.log("Argument 2 (d):", d);       // This SHOULD be the data object on sidebar. 'Undefined' when clicking on leaflet element
+
+    const changesetNumber = !d ? event.feature.feature.properties.meta.changeset : d.id;//'d.id' is available if changeset was selected in sidebar. 'd.feature...' is available in leaflet layer      
+    // console.log('changesetNumber: ' + changesetNumber);
+
     var results = d3.select('#results');
     results
         .selectAll('div.result')
         .classed('active', function (_) {
-            return _.id == (d.id || d.feature.feature.properties.meta.changeset);//'d.id' is available if changeset was selected in sidebar. 'd.feature...' is available in leaflet layer
+            //assign the class "active" if id of div element equals changeset number
+            return _.id == changesetNumber; //returns true if _.id equals the changeset number from above. Else it returns false.
         });
     //Reset the display of all map elements (to reset previously highlighted elements) 
     leafletGeoJsonObject.resetStyle();
 
-    const id = d.id ? d.id : d.feature.feature.properties.meta.changeset; //'d.id' is available if changeset was selected in sidebar. 'd.feature...' is available in leaflet layer
-
-    //Highlight all layers with a certain changeset number
+    //Highlight all layers with a certain changeset number.
     leafletGeoJsonObject.eachLayer(function (l) {
-        if (l.feature.properties.meta.changeset == id) {
+        // console.log(l.feature.properties.meta.changeset == changesetNumber);
+        if (l.feature.properties.meta.changeset == changesetNumber) {
             l.setStyle({ color: '#008dff' });//Highlighting color: blue
         }
     });

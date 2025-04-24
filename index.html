@@ -55,19 +55,26 @@
 
   <!-- External scripts -->
   <!-- Leaflet -->
-  <!-- <script src="//unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script> -->
-  <script src="./js/leaflet.js"></script>
+  <script src="./js/leaflet.js" defer></script>
   <!-- Leaflet Gesture Handling ("use 2 fingers to pan") -->
-  <script src="//unpkg.com/leaflet-gesture-handling"></script>
+  <script src="//unpkg.com/leaflet-gesture-handling" defer></script>
   <!-- Leaflet control to geolocate the user. -->
-  <!-- <script src="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.76.0/dist/L.Control.Locate.min.js"
-    charset="utf-8"></script> -->
-    <script src="./js/L.Control.Locate.min.js"></script>
-  <!-- Leaflet Contextmenu (Right mouse button menu)-->
+  <script src="./js/L.Control.Locate.min.js" defer></script>
+  <!-- Leaflet Contextmenu (Right mouse button menu) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-contextmenu/1.4.0/leaflet.contextmenu.min.js"
     integrity="sha512-8sfQf8cr0KjCeN32YPfjvLU2cMvyY1lhCXTMfpTZ16CvwIzeVQtwtKlxeSqFs/TpXjKhp1Dcv77LQmn1VFaOZg=="
-    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <!-- Activate for offline debugging -->
+    crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
+  <!-- Selections allow data-driven transformation of the document object model (DOM) -->
+  <script src='js/d3-selection.min.js' defer></script>
+  <!-- Parse, validate, manipulate, and display dates and times in JavaScript -->
+  <script src='js/moment.min.js' defer></script>
+  <!-- Add dynamic URL hashes to web pages with Leaflet maps, e.g. "#18/47.67643/9.49085" -->
+  <script src='js/leaflet-hash.js' defer></script>
+  <!-- Converts OSM data to GeoJSON -->
+  <script src='js/osmtogeojson.js' defer></script>
+
+  <!-- Application script - MUST BE LAST since it depends on the others -->
+  <script src='js/site.js' defer></script>
 </head>
 
 <body>
@@ -126,12 +133,6 @@
       <div id="loading-animation" class="hide"></div>
     </div>
   </div>
-  <script src='js/d3.v3.min.js'></script>
-  <script src='js/d3-queue.v3.min.js'></script>
-  <script src='js/moment.min.js'></script>
-  <script src='js/leaflet-hash.js'></script>
-  <script src='js/osmtogeojson.js'></script>
-  <script src='js/site.js'></script>
 </body>
 
 </html>
