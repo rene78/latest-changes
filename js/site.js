@@ -381,8 +381,8 @@ function run() {
             document.querySelector(".traffic-light-filter").classList.add("filter-red-color");
             document.querySelector("#filter-red-checkbox").checked = false;
 
-            //Clear old GeoJSON data from map
-            leafletGeoJsonObject && map.removeLayer(leafletGeoJsonObject);
+            //Clear old GeoJSON data from map for subsequent runs (during first run it is 'null')
+            if (leafletGeoJsonObject) map.removeLayer(leafletGeoJsonObject);
 
             //Create new GeoJSON layer, fill it with sorted features of downloaded OSM data and add it to the map
             leafletGeoJsonObject = new L.GeoJSON({
@@ -646,7 +646,7 @@ function run() {
                     //'Once' is needed to remove the mouseout event listener after execution. Else multiple mouseout
                     //event listeners are created on each mouseover event. This would lead to the following situation:
                     //This mouseout function would be called multiple times on subsequent mouseouts,
-                    //e.g. after 'mousevering' over the same element the 6th time this mouseout function is called 6 times instead of once.
+                    //e.g. after 'mouseovering' over the same element the 6th time this mouseout function is called 6 times instead of once.
 
                     // console.log('clearInterval called!');
                     clearInterval(interval);//stop oscillation of line weight
@@ -665,6 +665,7 @@ function run() {
             //here the leaflet layers and metadata is written into "changesets" object, which then goes to "bytime" array.
             leafletGeoJsonObject.eachLayer(function (l) {
                 if (!l.feature.properties.meta.changeset) return;
+                //Create new properties for this changeset number if it does not exist already.
                 changesets[l.feature.properties.meta.changeset] = changesets[l.feature.properties.meta.changeset] || {
                     id: l.feature.properties.meta.changeset,
                     time: new Date(l.feature.properties.meta.timestamp),
@@ -874,12 +875,9 @@ function run() {
 
             const promises = []; // Array to hold promises for changeset details
             const fetchChangesetBatch = (ids) => {
-                // Use the same abort signal for these requests if desired
                 const url = debugMode
                     ? "./examples/exampleOSMAPI.xml" // Handle debug mode (only makes one request)
                     : 'https://api.openstreetmap.org/api/0.6/changesets?changesets=' + ids.join(',');
-
-                //return d3.xml(url, { signal: signal }); // Return the Promise from d3.xml
 
                 // Use fetch, check response, parse XML
                 return fetch(url, { signal: signal }) // Return the promise chain
@@ -1346,14 +1344,14 @@ function filterChangesets() {
     displayGeoJson(foundChangesets);
 
     //Filter GeoJSON on map
-    function displayGeoJson(changesets) {
+    function displayGeoJson(foundChangesets) {
         //Remove old GeoJSON
         leafletGeoJsonObject.eachLayer(function (l) {
             map.removeLayer(l);
         });
 
         //Add layers of filtered changesets back to the map
-        for (const changeset of Object.values(changesets)) {
+        for (const changeset of Object.values(foundChangesets)) {
             // console.log(changesets.layers);
             for (let i = 0; i < changeset.layers.length; i++) {
                 map.addLayer(changeset.layers[i]);
