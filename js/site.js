@@ -258,18 +258,17 @@ function toggleWaitingScreen() {
 //On page load: Check if map is zoomed in enough. If yes: Download OSM changeset data from overpass
 const overpass_server = '//overpass-api.de/api/'; //'https://overpass.kumi.systems/api/';
 const vandalismThreshold = -3; //If 3 more elements or tags have been deleted than added, the traffic light will change to red
-let leafletGeoJsonObject = null; //All the GeoJSON data will go into this variable
 const debugMode = false; //False (default): Do an API call to Overpass. True: Use locally saved xml files for debugging purposes
 
 // Reset AbortController to null during load of script. Needed to reset all Promise requests.
 window.currentAbortController = null;
 
+// All relevant changeset information will be saved in this object
+let changesets = {};
+
 //Check if map is zoomed in enough (only executed on initial page load)
 const isMapZoomedInEnough = updateMap();
 if (isMapZoomedInEnough) run();
-
-//Variable with infos for all downloaded changeset
-let changesets = {};
 
 //Start download of changeset data and initiate rendering of changesets list and GeoJSON data on map
 function run() {
@@ -286,6 +285,12 @@ function run() {
     // 2. Create a NEW controller for THIS run
     window.currentAbortController = new AbortController();
     const signal = window.currentAbortController.signal; // Get the signal for this run
+
+    // Clear old GeoJSON data from map and reset the main object
+    if (changesets.allLeafletLayers) {
+        map.removeLayer(changesets.allLeafletLayers);
+    }
+    changesets = {}; // Reset the main object for the new run
 
     // Get current extension of displayed leaflet map
     const bounds = map.getBounds();
@@ -320,8 +325,8 @@ function run() {
             let newData = document.implementation.createDocument(null, 'osm');
             let oldData = document.implementation.createDocument(null, 'osm');
             allOverpassXMLDataElements = data.querySelectorAll('action');
+            // console.log(allOverpassXMLDataElements);
             //Separate changed (new) and pre-change (old) OSM map data into respective xml objects
-            // console.log(elements);
             for (let i = 0; i < allOverpassXMLDataElements.length; i++) {
                 const element = allOverpassXMLDataElements[i];
                 // console.log(element);
@@ -351,11 +356,13 @@ function run() {
                                 }
                             }
                         }
-                        // fake changeset id on old data
+                        // fake changeset meta data on old data
                         oldElement.setAttribute('changeset', newElement.getAttribute('changeset'));
                         oldElement.setAttribute('user', newElement.getAttribute('user'));
                         oldElement.setAttribute('uid', newElement.getAttribute('uid'));
                         oldElement.setAttribute('timestamp', newElement.getAttribute('timestamp'));
+
+                        // add node to 'newData' and 'oldData'
                         if (element.getAttribute('type') == 'modify')
                             newData.documentElement.appendChild(newElement);
                         oldData.documentElement.appendChild(oldElement);
@@ -368,113 +375,14 @@ function run() {
                 feature.properties.__is_old__ = true;
             });
 
-            //Change app display from "loading" to "ready"
-            d3.select('#map').classed('faded', false);
-            toggleWaitingScreen();
-
-            //Display filter changesets toolbar
-            document.querySelector(".filter-container").classList.remove("hide");
-            //Remove content of "filter changeset input" and hide X (in case old text from a previous download is still there)
-            document.querySelector(".search-changesets-field").value = "";
-            document.querySelector(".delete-filter-input").classList.add("hide");
-            //Reset display of "filter-red-checkbox" (in case it has been checked on a previous download)
-            document.querySelector(".traffic-light-filter").classList.add("filter-red-color");
-            document.querySelector("#filter-red-checkbox").checked = false;
-
-            //Clear old GeoJSON data from map for subsequent runs (during first run it is 'null')
-            if (leafletGeoJsonObject) map.removeLayer(leafletGeoJsonObject);
-
-            //Create new GeoJSON layer, fill it with sorted features of downloaded OSM data and add it to the map
-            leafletGeoJsonObject = new L.GeoJSON({
-                type: 'FeatureCollection',
-                features: [].concat(oldGeojson.features)
-                    .concat(newGeojson.features)
-                    .sort(sortGeoJsonFeatures)
-            }, {
-                style: setStyle,
-                pointToLayer: function (feature, latlng) {
-                    return L.circleMarker(latlng, { radius: 8 });
-                },
-                onEachFeature: onEachFeature
-            }).addTo(map);
-
-            /* Sort GeoJSON features by geometry type and size.
-            By doing this we can make sure that an element which is completely covered by a larger polygon can still be selected.
-        
-            Sort order (i.e. order in which they are added to the map):
-            1. Polygons (largest to smallest)
-            2. Lines
-            3. Points
-            
-            Background:
-            GeoJSON features that are added later to the map are always on top of elements that are added earlier. So if we first
-            add large polygons and only afterwards the smaller ones everything should be selectable. 
-            */
-            function sortGeoJsonFeatures(a, b) {
-                const typeOrder = { 'Polygon': 1, 'MultiPolygon': 1, 'LineString': 2, 'Point': 3 };
-                const aType = a.geometry.type;
-                const bType = b.geometry.type;
-
-                // First sort by geometry type
-                if (typeOrder[aType] !== typeOrder[bType]) {
-                    return typeOrder[aType] - typeOrder[bType];
-                }
-
-                // Then sort polygons by area (largest first)
-                if (aType === 'Polygon' || aType === 'MultiPolygon') {
-                    const aArea = calculateArea(a.geometry);
-                    const bArea = calculateArea(b.geometry);
-                    return bArea - aArea; // Reverse the subtraction for descending order
-                }
-
-                return 0;
-            };
-
-            //Check if Polygon or Multipolygon can actually be removed because no Multipolygons in dataset.
-            function calculateArea(geometry) {
-                if (geometry.type === 'Polygon') {
-                    return polygonArea(geometry.coordinates[0]);
-                }
-                if (geometry.type === 'MultiPolygon') {
-                    return geometry.coordinates.reduce((acc, polygon) =>
-                        acc + polygonArea(polygon[0]), 0);
-                }
-                return 0;
-            };
-
-            /*Calculate relative area of polygon.
-            This so called 'Shoelace formula' does not return accurate results in m² because it only works for planar
-            2D coordinates. Our geo coordinates are on a sphere though (in degrees). Since we only want to compare
-            the relative size of each polygon for sorting purposes the formula is sufficient.*/
-            function polygonArea(coords) {
-                let area = 0;
-                for (let i = 0; i < coords.length; i++) {
-                    const j = (i + 1) % coords.length; //j is always x+1 except on the last element of the array where it is 0.
-                    const [xi, yi] = coords[i];
-                    const [xj, yj] = coords[j];
-                    area += xi * yj - xj * yi;
-                }
-
-                return Math.abs(area) / 2;
-            };
-
-            //Define style of GeoJSON elements
-            function setStyle(f) {
-                return {
-                    color: defineColor(new Date(f.properties.meta.timestamp)),
-                    opacity: f.properties.__is_old__ === true ? 0.2 : 1,
-                    weight: 3
-                }
-            };
-
-            //Define what happens when hovering over each polygon/way/marker
+            //Define what functionality is given to each polygon/way/marker
             function onEachFeature(feature, layer) {
                 // Assign a unique layer ID to each Leaflet layer using the OSM feature ID, appended with 'o' for old features and 'n' for new ones.
                 const OsmIdOfHoveredElement = feature.properties.id;//OSM element ID
                 const isOld = feature.properties.__is_old__;
                 layer._leaflet_id = OsmIdOfHoveredElement + (isOld ? 'o' : 'n');
 
-                //Increase line weight when feature gets focus. Also highlight twin element if feature has been moved
+                //Define what happens on mouseover: Increase line weight when feature gets focus. Also highlight twin element if feature has been moved
                 layer.on('mouseover', function (e) {
                     // console.log(layer);
                     layer.setStyle({ weight: 6 }); //increase line weight of hovered layer
@@ -482,6 +390,8 @@ function run() {
                     //Write both XML nodes of old and new element into variable "xmlElements"
                     const xmlElements = data.querySelectorAll('[id="' + OsmIdOfHoveredElement + '"]');
                     // console.log(xmlElements);
+                    // Guard against missing elements or parent structure
+                    if (!xmlElements || xmlElements.length === 0 || !xmlElements[0].parentNode || !xmlElements[0].parentNode.parentNode) return;
                     const action = xmlElements[0].parentNode.parentNode.getAttribute('type');
                     // console.log(action);
                     //Check if action is 'modify'. If yes: Highlight non-hovered twin element of nodes, lines and polygons as well. Skip unmoved elements.
@@ -498,7 +408,7 @@ function run() {
                             if (latEl0 !== latEl1 || lonEl0 !== lonEl1) {
                                 // console.log('Coordinates of old and new node are NOT identical --> node has been moved! Highlight twin element.');
                                 // Get the Leaflet layer of the twin element. It shares the same ID number but has the opposite suffix from the hovered element.
-                                const leafletLayerOfTwin = leafletGeoJsonObject.getLayer(OsmIdOfHoveredElement + (isOld ? 'n' : 'o'));
+                                const leafletLayerOfTwin = changesets.allLeafletLayers.getLayer(OsmIdOfHoveredElement + (isOld ? 'n' : 'o'));
 
                                 if (!leafletLayerOfTwin) {
                                     // console.log('Twin element is not available. This usually means that 1. The node is part of way 2. The old version of the node had no tags. "osmtogeojson" will NOT convert those nodes into GeoJSON');
@@ -512,8 +422,9 @@ function run() {
                         //If there is a difference the element has been changed. Solution below is from https://github.com/tyrasd/geojson-length.
                         else if (xmlElements[0].tagName === "way") {
                             // Get the Leaflet layer of the twin element. It shares the same ID number but has the opposite suffix from the hovered element.
-                            const leafletLayerOfTwin = leafletGeoJsonObject.getLayer(OsmIdOfHoveredElement + (isOld ? 'n' : 'o'));
+                            const leafletLayerOfTwin = changesets.allLeafletLayers.getLayer(OsmIdOfHoveredElement + (isOld ? 'n' : 'o'));
                             // console.log('Name of leafletLayerOfTwin: ' + OsmIdOfHoveredElement + (isOld ? 'n' : 'o'));
+                            if (!leafletLayerOfTwin) return; // Return if there is no twin. Should never happen.
 
                             //Compare length and position of hovered and twin element.
                             const geometryIsDifferent = checkIfLengthOfLineOrPolygonHasChanged(layer, leafletLayerOfTwin);
@@ -524,10 +435,89 @@ function run() {
 
                 //Change line weight back when feature loses focus
                 layer.on('mouseout', function (e) {
-                    // leafletGeoJsonObject.resetStyle();
+                    // changesets.allLeafletLayers.resetStyle(layer); // More specific reset
                     layer.setStyle({ weight: 3 });
+                    // The highlightTwinElementLocation function handles resetting the twin's style more comprehensively
                 });
             }
+
+            const sharedGeoJsonOptions = {
+                style: setStyle,
+                pointToLayer: function (feature, latlng) {
+                    return L.circleMarker(latlng, { radius: 8 });
+                },
+                onEachFeature: onEachFeature
+            };
+
+            //Define style of GeoJSON elements
+            function setStyle(f) {
+                return {
+                    color: defineColor(new Date(f.properties.meta.timestamp)),
+                    opacity: f.properties.__is_old__ === true ? 0.2 : 1,
+                    weight: 3
+                }
+            };
+
+            //Combine old and new GeoJSON into one
+            let allGeojsonFeatures = [].concat(oldGeojson.features).concat(newGeojson.features);
+            // console.log(allGeojsonFeatures);
+
+            //Sort allGeojsonFeatures before writing it into the changesets object
+            allGeojsonFeatures.sort(sortGeoJsonFeatures); // Sort features before creating the Leaflet GeoJSON layer
+
+            //Add all GeoJSON features to the map and store them in the changesets object
+            changesets.allLeafletLayers = L.geoJSON(allGeojsonFeatures, sharedGeoJsonOptions).addTo(map);
+
+            //Traverse all the layers that have been added to the map and create an entry for each changeset in changesets
+            //Create a logical featureGroup for each changeset (not added to the map directly).
+            changesets.allLeafletLayers.eachLayer(function (l) {
+                // Guard against features without changeset meta, which can happen if osmtogeojson couldn't associate them
+                if (!l.feature.properties.meta || !l.feature.properties.meta.changeset) {
+                    // console.warn("Feature without changeset meta:", l.feature);
+                    return;
+                }
+                const changesetNumber = l.feature.properties.meta.changeset;
+
+                if (changesets[changesetNumber] === undefined) {
+
+                    changesets[changesetNumber] = {
+                        id: changesetNumber,
+                        time: new Date(l.feature.properties.meta.timestamp),
+                        user: l.feature.properties.meta.user,
+                        comment: '',
+                        deltaInNodesWays: 0,
+                        deltaInTags: 0,
+                        possibleVandalism: false,
+                        osmEditor: '',
+                        discussionCount: 0, // Initialize
+                        deltaInIdWarningsAndResolves: 0, // Initialize
+                        leafletFeatureGroup: L.featureGroup() // Logical group, not added to map here
+                    };
+                }
+                //Add the layer to their respective changeset feature groups in changesets
+                changesets[changesetNumber].leafletFeatureGroup.addLayer(l);
+            });
+
+            //Example 1: This is how to change the style of a specific changeset on the map
+            //const aSpecificChangeset = changesets[154564334].leafletFeatureGroup;
+            //aSpecificChangeset.setStyle({ color: 'pink', opacity: 1 });
+
+            //Example 2: Access a single geojson feature
+            //const aSpecificFeature = changesets.allLeafletLayers.getLayer('2222222222o');//the layer id got turned into a string after adding the letter as suffix, so do not forget the ''.
+            //aSpecificFeature.setStyle({ color: 'pink', opacity: 1 });
+
+            //Change app display from "loading" to "ready"
+            d3.select('#map').classed('faded', false);
+            toggleWaitingScreen();
+
+            //Display filter changesets toolbar
+            document.querySelector(".filter-container").classList.remove("hide");
+            //Remove content of "filter changeset input" and hide X (in case old text from a previous download is still there)
+            document.querySelector(".search-changesets-field").value = "";
+            document.querySelector(".delete-filter-input").classList.add("hide");
+            //Reset display of "filter-red-checkbox" (in case it has been checked on a previous download)
+            document.querySelector(".traffic-light-filter").classList.add("filter-red-color");
+            document.querySelector("#filter-red-checkbox").checked = false;
 
             //Compare length and position of hovered and twin element.
             //return true: Geometry has been changed
@@ -550,7 +540,7 @@ function run() {
                 const getCoordinates = layer =>
                     layer.feature.geometry.type === 'LineString'
                         ? layer.feature.geometry.coordinates
-                        : layer.feature.geometry.coordinates[0];
+                        : layer.feature.geometry.coordinates[0]; // For Polygons
 
                 //Calculate length of both elements
                 const coordinatesOfHoveredElement = getCoordinates(leafletLayerOfHoveredElement);
@@ -604,7 +594,7 @@ function run() {
                  */
                 function distance(λ1, φ1, λ2, φ2) {
                     const R = 6371000;
-                    Δλ = (λ2 - λ1) * Math.PI / 180;
+                    const Δλ = (λ2 - λ1) * Math.PI / 180;
                     φ1 = φ1 * Math.PI / 180;
                     φ2 = φ2 * Math.PI / 180;
                     const x = Δλ * Math.cos((φ1 + φ2) / 2);
@@ -650,7 +640,10 @@ function run() {
 
                     // console.log('clearInterval called!');
                     clearInterval(interval);//stop oscillation of line weight
-                    leafletGeoJsonObject.resetStyle(leafletLayerOfTwin);//reset style of oscillating geometry, i.e. line weight back to 3, opacity back to previous value and color back shade of red
+
+                    //Reset style of oscillating geometry, i.e. line weight back to 3, opacity back to previous value and color back shade of red
+                    changesets.allLeafletLayers.resetStyle(leafletLayerOfTwin);
+
                     //If this geometry belongs to highlighted changeset --> change it back to the highlighting color (i.e. blue)
                     if (preHoverColor === '#008dff') {
                         // console.log('%c The color is blue! ', 'background: ' + preHoverColor + '; color: #000000', 'So change color back to blue');
@@ -661,34 +654,15 @@ function run() {
                 });
             }
 
-            changesets = {};//Empty the changesets object in case of a subsequent run
-            //here the leaflet layers and metadata is written into "changesets" object, which then goes to "bytime" array.
-            leafletGeoJsonObject.eachLayer(function (l) {
-                if (!l.feature.properties.meta.changeset) return;
-                //Create new properties for this changeset number if it does not exist already.
-                changesets[l.feature.properties.meta.changeset] = changesets[l.feature.properties.meta.changeset] || {
-                    id: l.feature.properties.meta.changeset,
-                    time: new Date(l.feature.properties.meta.timestamp),
-                    user: l.feature.properties.meta.user,
-                    comment: '',
-                    deltaInNodesWays: 0,
-                    deltaInTags: 0,
-                    possibleVandalism: false,
-                    osmEditor: '',
-                    layers: []
-                };
-                changesets[l.feature.properties.meta.changeset].layers.push(l);
-            });
-
-            leafletGeoJsonObject.on('click', function (e) {
+            // Attach click listener to the main GeoJSON layer
+            changesets.allLeafletLayers.on('click', function (e) {
                 //Highlight clicked layer on map and in sidebar
-                click({ feature: e.layer });
+                click(e.layer.feature, null); // Pass feature as first arg, null for d to match signature
                 //Scroll selected element into view in sidebar
                 //(Only on large screens. On small screens the map would scroll out of view, which is annoying)
                 if (screen.width > 600) {
-                    document.querySelector('.active').scrollIntoView({
-                        behavior: 'smooth'
-                    });
+                    const activeEl = document.querySelector('.active');
+                    if (activeEl) activeEl.scrollIntoView({ behavior: 'smooth' });
                 }
 
                 const tableHtml = createTable(e.layer.feature.properties.id)
@@ -714,13 +688,18 @@ function run() {
                     if (!action) action = "create";//The xml data structure is different for "create" nodes, thus action will be "null" in the line above
                     // console.log(action);
 
-                    //Create header with element info
-                    let tableHtml = `<span class="${action} capitalize">${action}</span> ${node[0].nodeName} <a href="https://www.openstreetmap.org/${node[0].nodeName}/${node[0].getAttribute("id")}" target="_blank" rel="noopener noreferrer">${node[0].getAttribute("id")}</a> <a href="http://osmlab.github.io/osm-deep-history/#/${node[0].nodeName}/${node[0].getAttribute("id")}" title="Get complete history of element in 'OSM Deep History'" target="_blank" rel="noopener noreferrer"><svg class="clock-with-circular-arrow-symbol"><use href="img/icons.svg#clock-with-circular-arrow"></use></svg></a>`;
+                    //Create header with type of action (i.e. create, modify or delete), type of element (i.e. node or way), OSM id and link to 'OSM Deep History'.
+                    let tableHtml = `
+                        <span class="${action} capitalize">${action}</span>
+                        ${node[0].nodeName}
+                        <a href="https://www.openstreetmap.org/${node[0].nodeName}/${node[0].getAttribute("id")}" target="_blank" rel="noopener noreferrer">${node[0].getAttribute("id")}</a>
+                        <a href="http://osmlab.github.io/osm-deep-history/#/${node[0].nodeName}/${node[0].getAttribute("id")}" title="Get complete history of element in 'OSM Deep History'" target="_blank" rel="noopener noreferrer">
+                            <svg class="clock-with-circular-arrow-symbol"><use href="img/icons.svg#clock-with-circular-arrow"></use></svg>
+                        </a>
+                        <table class="table-container">
+                    `;
 
-                    //Variables
-                    tableHtml += `<table class="table-container">`;
-
-                    //Object with all key-value pairs for new and old and relevant meta tags for table
+                    //Object with all key-value pairs for new and old feature and relevant meta tags for table
                     const keyvalues = { old: { meta: {}, tags: {} }, new: { meta: {}, tags: {} } };
 
                     //1 CREATE
@@ -827,7 +806,7 @@ function run() {
                                 cssClass = "delete";
                                 newTag = "";
                             }
-                            //Case 2: Tag created in new --> Background color create, change from "undefined" to ""
+                            //Case 2: Tag created in new --> Background color green, change from "undefined" to ""
                             else if (!oldTag) {
                                 cssClass = "create";
                                 oldTag = "";
@@ -835,8 +814,8 @@ function run() {
                             //Case 3: Tag different in new --> Background color yellow
                             else if (oldTag !== newTag) cssClass = "modify";
 
-                            //Case 4: Tags similar --> Don't display this key-value pair
-                            else cssClass = "'unchanged'";
+                            //Case 4: Tags similar --> Default (i.e. no) background color
+                            else cssClass = "unchanged";
 
                             tableHtml += `
                                 <tr ${(cssClass ? 'class=' + cssClass : '')}>
@@ -908,49 +887,52 @@ function run() {
             if (signal.aborted) {
                 throw new DOMException('Aborted', 'AbortError');
             }
+            // console.log(xmls);
             // 'xmls' is the array of parsed XML documents from the changeset details
+            // the forEach below is needed if there have been more than 100 changesets fetched and the length of the xmls array is > 1.
             xmls.forEach(function (xmlDoc) {
+                // console.log(xmlDoc);
                 const css = xmlDoc.getElementsByTagName('changeset');
                 // console.log(css);
                 for (let i = 0; i < css.length; i++) {
                     const cid = css[i].getAttribute('id');
-                    //Write discussion count to changesets object
-                    changesets[cid].discussionCount = +css[i].getAttribute("comments_count");
-                    //Write changeset comment to changesets object
-                    const commentTag = css[i].querySelector('tag[k="comment"]');
-                    if (commentTag)
-                        changesets[cid].comment = commentTag.getAttribute('v');
+                    if (changesets[cid]) { // Check if changeset exists in our main object
+                        //Write discussion count to changesets object after converting it to a number
+                        changesets[cid].discussionCount = +css[i].getAttribute("comments_count");
+                        //Write changeset comment to changesets object
+                        const commentTag = css[i].querySelector('tag[k="comment"]');
+                        if (commentTag) changesets[cid].comment = commentTag.getAttribute('v');
 
-                    //Get sum of warnings and resolved iD warnings for each changeset and write the delta into changesets object
-                    // console.log(css[i]);
-                    const tagsWithResolvedIdWarnings = css[i].querySelectorAll('tag[k^="resolved"]');
-                    const nIdResolvedWarnings = getSumOfiDWarningsAndResolvedWarnings(tagsWithResolvedIdWarnings);
-                    const tagsWithIdWarnings = css[i].querySelectorAll('tag[k^="warning"]');
-                    const nIdWarnings = getSumOfiDWarningsAndResolvedWarnings(tagsWithIdWarnings);
+                        //Get sum of warnings and resolved iD warnings for each changeset and write the delta into changesets object
+                        // console.log(css[i]);
+                        const tagsWithResolvedIdWarnings = css[i].querySelectorAll('tag[k^="resolved"]');
+                        const nIdResolvedWarnings = getSumOfiDWarningsAndResolvedWarnings(tagsWithResolvedIdWarnings);
+                        const tagsWithIdWarnings = css[i].querySelectorAll('tag[k^="warning"]');
+                        const nIdWarnings = getSumOfiDWarningsAndResolvedWarnings(tagsWithIdWarnings);
 
-                    function getSumOfiDWarningsAndResolvedWarnings(tagsWithResolvedIdWarnings) {
-                        let counter = 0;
-                        tagsWithResolvedIdWarnings.forEach(tag => {
-                            const value = +tag.getAttribute('v');
-                            // console.log(value);
-                            counter += value;
-                        });
-                        return counter;
+                        function getSumOfiDWarningsAndResolvedWarnings(tagsWithWarnings) {
+                            let counter = 0;
+                            tagsWithWarnings.forEach(tag => { // Use the passed parameter
+                                const value = +tag.getAttribute('v');
+                                // console.log(value);
+                                counter += value;
+                            });
+                            return counter;
+                        }
+                        changesets[cid].deltaInIdWarningsAndResolves = nIdResolvedWarnings - nIdWarnings;
+
+                        ////Get name of used OSM editor
+                        const osmEditorTag = css[i].querySelector('tag[k="created_by"]');
+                        if (osmEditorTag)
+                            changesets[cid].osmEditor = osmEditorTag.getAttribute('v');
                     }
-                    changesets[cid].deltaInIdWarningsAndResolves = nIdResolvedWarnings - nIdWarnings;
-
-                    ////Get name of used OSM editor
-
-                    const osmEditorTag = css[i].querySelector('tag[k="created_by"]');
-                    if (osmEditorTag)
-                        changesets[cid].osmEditor = osmEditorTag.getAttribute('v');
                 }
             });
 
             /*Vandalism Checker
             Simple sanity checker for all the downloaded changesets. 3 things are checked:
             1. It summarizes the number of all elements which have been added or deleted
-            1. It summarizes the number of all elements which have been added or deleted
+            2. It summarizes the number of all tags which have been added or deleted
             3. It summarizes the number of all iD warnings and resolved iD warnings
             for each changeset. If the sum is below a certain treshold (currently -3) then a traffic light changes to red to alert the user
             about this changeset.*/
@@ -962,74 +944,75 @@ function run() {
                     // console.log(type);
 
                     //Get changeset number
-                    let changesetNumber
+                    let changesetNumber;
                     if (type === "create") changesetNumber = allOverpassXMLDataElements[i].lastElementChild.getAttribute("changeset");
                     else changesetNumber = allOverpassXMLDataElements[i].lastElementChild.firstElementChild.getAttribute("changeset");
                     // console.log(changesetNumber);
 
-                    //Check which action is performed
-                    //"Create"
-                    //deltaInNodesWays++
-                    //deltaInTags += nTagsAdded
-                    if (type === "create" && changesets[changesetNumber]) {
-                        //Check the amount of tags that have been added
-                        const nTagsAdded = allOverpassXMLDataElements[i].lastElementChild.querySelectorAll("tag").length;
-                        // console.log(nTagsAdded);
-                        changesets[changesetNumber].deltaInTags += nTagsAdded;
+                    if (changesets[changesetNumber]) { // Check if changeset exists in our main object
+                        //Check which action is performed
+                        //"Create"
+                        //deltaInNodesWays++
+                        //deltaInTags += nTagsAdded
+                        if (type === "create") {
+                            //Check the amount of tags that have been added
+                            const nTagsAdded = allOverpassXMLDataElements[i].lastElementChild.querySelectorAll("tag").length;
+                            // console.log(nTagsAdded);
+                            changesets[changesetNumber].deltaInTags += nTagsAdded;
 
-                        //If a node with 0 tags has been created: Do not add it to deltaInNodesWays
-                        //(normally it is just a newly created node of an already existing way)
+                            //If a node with 0 tags has been created: Do not add it to deltaInNodesWays
+                            //(normally it is just a newly created node of an already existing way)
 
-                        //Get element type (i.e. "node" or "way")
-                        const elementType = allOverpassXMLDataElements[i].firstElementChild.nodeName;
-                        // console.log(elementType);
+                            //Get element type (i.e. "node" or "way")
+                            const elementType = allOverpassXMLDataElements[i].firstElementChild.nodeName;
+                            // console.log(elementType);
 
-                        if (elementType === "node" && nTagsAdded == 0) continue;
-                        else changesets[changesetNumber].deltaInNodesWays++;
-                    }
+                            if (elementType === "node" && nTagsAdded == 0) continue;
+                            else changesets[changesetNumber].deltaInNodesWays++;
+                        }
 
-                    // "Modify"
-                    //deltaInNodesWays = unchanged
-                    //deltaInTags += nTagsNew - nTagsOld
-                    if (type === "modify" && changesets[changesetNumber]) {
-                        const nTagsNew = allOverpassXMLDataElements[i].lastElementChild.firstElementChild.querySelectorAll("tag").length;
-                        const nTagsOld = allOverpassXMLDataElements[i].firstElementChild.firstElementChild.querySelectorAll("tag").length;
-                        // console.log(nTagsNew);
-                        // console.log(nTagsOld);
-                        changesets[changesetNumber].deltaInTags += (nTagsNew - nTagsOld);
-                    }
+                        // "Modify"
+                        //deltaInNodesWays = unchanged
+                        //deltaInTags += nTagsNew - nTagsOld
+                        if (type === "modify") {
+                            const nTagsNew = allOverpassXMLDataElements[i].lastElementChild.firstElementChild.querySelectorAll("tag").length;
+                            const nTagsOld = allOverpassXMLDataElements[i].firstElementChild.firstElementChild.querySelectorAll("tag").length;
+                            // console.log(nTagsNew);
+                            // console.log(nTagsOld);
+                            changesets[changesetNumber].deltaInTags += (nTagsNew - nTagsOld);
+                        }
 
-                    // "Delete"
-                    //deltaInNodesWays--
-                    //deltaInTags -= nTags
-                    if (type === "delete" && changesets[changesetNumber]) {
-                        const nTagsDeleted = allOverpassXMLDataElements[i].firstElementChild.querySelectorAll("tag").length;
-                        // console.log(nTagsDeleted);
-                        changesets[changesetNumber].deltaInTags -= nTagsDeleted;
+                        // "Delete"
+                        //deltaInNodesWays--
+                        //deltaInTags -= nTags
+                        if (type === "delete") {
+                            // The 'old' element in a delete action is under element.firstElementChild.firstElementChild
+                            const oldElementNode = allOverpassXMLDataElements[i].firstElementChild.firstElementChild;
+                            const nTagsDeleted = oldElementNode.querySelectorAll("tag").length;//Number of deleted tags
+                            // console.log(nTagsDeleted);
+                            changesets[changesetNumber].deltaInTags -= nTagsDeleted;
 
-                        //If a node with 0 tags has been deleted: Do not subtract it from deltaInNodesWays
-                        // (normally it is just a newly deleted node of an already existing way)
+                            //Get element type (i.e. "node" or "way")
+                            const elementType = oldElementNode.nodeName;
+                            // console.log(elementType);
 
-                        //Get element type (i.e. "node" or "way")
-                        const elementType = allOverpassXMLDataElements[i].firstElementChild.firstElementChild.nodeName;
-                        // console.log(elementType);
-                        //Check the amount of tags before deletion
-                        const nTagsBeforeDeletion = allOverpassXMLDataElements[i].firstElementChild.firstElementChild.querySelectorAll("tag").length;
-                        // console.log(nTagsBeforeDeletion);
-                        if (elementType === "node" && nTagsBeforeDeletion == 0) continue;
-                        else changesets[changesetNumber].deltaInNodesWays--;
+                            //If a node with 0 tags has been deleted: Do not subtract it from deltaInNodesWays
+                            // (normally it is just a newly deleted node of an already existing way)
+                            if (elementType === "node" && nTagsDeleted == 0) continue;
+                            else changesets[changesetNumber].deltaInNodesWays--;
+                        }
                     }
                 }
 
                 //Write boolean value 'possibleVandalims' into 'changesets'
-                for (const changeset in changesets) {
-                    // console.log(changeset);
-
+                for (const changesetId in changesets) {
+                    const cs = changesets[changesetId];
+                    // console.log(changesetId);
                     //Check how many warnings and resolves iD editor produced.
-                    // console.log("Changeset number: " + changeset + ", deltaInIdWarningsAndResolves: " + changesets[changeset].deltaInIdWarningsAndResolves);
+                    // console.log("Changeset number: " + changesetId + ", deltaInIdWarningsAndResolves: " + cs.deltaInIdWarningsAndResolves);
 
-                    if ((changesets[changeset].deltaInNodesWays < vandalismThreshold) || (changesets[changeset].deltaInTags < vandalismThreshold) || (changesets[changeset].deltaInIdWarningsAndResolves < vandalismThreshold)) {
-                        changesets[changeset].possibleVandalism = true;
+                    if ((cs.deltaInNodesWays < vandalismThreshold) || (cs.deltaInTags < vandalismThreshold) || (cs.deltaInIdWarningsAndResolves < vandalismThreshold)) {
+                        cs.possibleVandalism = true;
                     }
                 }
             }
@@ -1053,7 +1036,7 @@ function run() {
 
             } else {
                 // Handle actual network or processing errors
-                toggleWaitingScreen();
+                toggleWaitingScreen(); // Ensure loading screen is off
                 console.error("Error fetching or processing data:", error); // Log the actual error
                 message("alarm", "Server error: " + (error.message || "Could not load data."));
             }
@@ -1067,12 +1050,68 @@ function run() {
         });
 }
 
+/* Sort GeoJSON features by geometry type and size.
+   By doing this we can make sure that an element which is completely covered by a larger polygon can still be selected.
+   Sort order (i.e. order in which they are added to the map):
+   1. Polygons (largest to smallest)
+   2. Lines
+   3. Points
+*/
+function sortGeoJsonFeatures(a, b) { // a and b are GeoJSON features
+    const typeOrder = { 'Polygon': 1, 'MultiPolygon': 1, 'LineString': 2, 'Point': 3 };
+    const aType = a.geometry.type;
+    const bType = b.geometry.type;
+    if (typeOrder[aType] !== typeOrder[bType]) {
+        return typeOrder[aType] - typeOrder[bType];
+    }
+    if (aType === 'Polygon' || aType === 'MultiPolygon') {
+        const aArea = calculateArea(a.geometry);
+        const bArea = calculateArea(b.geometry);
+        return bArea - aArea; // Largest first (Reverse the subtraction for descending order)
+    }
+    return 0;
+};
+
+//Check if Polygon or Multipolygon (can actually be removed because no Multipolygons in dataset.)
+function calculateArea(geometry) {
+    if (geometry.type === 'Polygon') {
+        return polygonArea(geometry.coordinates[0]);
+    }
+    if (geometry.type === 'MultiPolygon') {
+        return geometry.coordinates.reduce((acc, polygon) =>
+            acc + polygonArea(polygon[0]), 0);
+    }
+    return 0;
+};
+
+/*Calculate relative area of polygon.
+This so called 'Shoelace formula' does not return accurate results in m² because it only works for planar
+2D coordinates. Our geo coordinates are on a sphere though (in degrees). Since we only want to compare
+the relative size of each polygon for sorting purposes the formula is sufficient.*/
+function polygonArea(coords) {
+    let area = 0;
+    for (let i = 0; i < coords.length; i++) {
+        const j = (i + 1) % coords.length; //j is always x+1 except on the last element of the array where it is 0.
+        const [xi, yi] = coords[i];
+        const [xj, yj] = coords[j];
+        area += xi * yj - xj * yi;
+    }
+    return Math.abs(area) / 2;
+};
+
 //Render changesets list on the left side
 function renderChangesetsList(changesetsToDisplay) {
+    // console.log(changesetsToDisplay);
     //Object.values writes all values of 'changesetsToDisplay' object into an array
     //Then the array elements (i.e. changesets) are sorted newest to oldest
     const bytime = Object.values(changesetsToDisplay)
+        // Filter out non-changeset properties like 'allLeafletLayers'.
+        // Workflow: Is 'cs' NOT 'null' or undefined? And does it have a valid '.id' property? If true: keep this changeset in 'bytime'.
+        // If false: Filter it out. 'allLeafletLayers' does not have an '.id' property.
+        .filter(cs => cs && typeof cs.id !== 'undefined')
         .sort((a, b) => (+b.time) - (+a.time));
+
+    // console.log(bytime);
 
     //From here onwards the creation of the changesets section starts
     const results = d3.select('#results').html("");//Select and Clear the Results Container
@@ -1086,8 +1125,8 @@ function renderChangesetsList(changesetsToDisplay) {
         .attr('class', 'result')
         .attr('title', 'Changeset is highlighted on map')
         .style('color', d => defineColor(d.time))
-        .on('click', click)//Highlight changeset on click (desktop/mobile)
-        .on('mouseover', click);//Highlight changeset on mouseover (desktop)
+        .on('click', (event, d) => click(null, d))//Highlight changeset on click (desktop/mobile) - Pass null for feature, d for data
+        .on('mouseover', (event, d) => click(null, d));//Highlight changeset on mouseover (desktop) - Pass null for feature, d for data
     // console.log(rl);
     allresults.order();
 
@@ -1097,20 +1136,17 @@ function renderChangesetsList(changesetsToDisplay) {
         .attr('title', 'Zoom to changeset')
         //.html('&#x1F50E; ')//Unicode glyph for a loupe
         .on('click', function (event, d) {
-            //Check each layer on the map. If it belongs to clicked changeset --> add it to a featureGroup
-            //(featureGroup needed because layers with points only don't have a getBounds function)
-            event.preventDefault();
-            const id = d.id;
-            const changesetLayers = L.featureGroup();
-            leafletGeoJsonObject.eachLayer(function (l) {
-                if (l.feature.properties.meta.changeset == id) l.addTo(changesetLayers);
-            });
-            //Zoom and pan to featureGroup
-            map.fitBounds(changesetLayers.getBounds());
+            //Fit the bounds of the Leaflet layers featureGroup for this changeset
+            if (changesets[d.id] && changesets[d.id].leafletFeatureGroup) {
+                const groupToZoom = changesets[d.id].leafletFeatureGroup;
+                const bounds = groupToZoom.getBounds();
+                map.fitBounds(bounds);
+            }
+
             //On small screens (screen width < 601px) scroll all the way down, so that map is completely visible on screen
             if (screen.width < 601) {
                 window.scrollTo({
-                    top: 2222,
+                    top: document.body.scrollHeight, // Scroll to the bottom of the page ('document.body.scrollHeight' returns the total height of the entire document body)
                     behavior: 'smooth'
                 });
             }
@@ -1124,54 +1160,42 @@ function renderChangesetsList(changesetsToDisplay) {
     let trafficLightContainer = rl.append("div")
         .classed("traffic-light-container", true)
         .attr('title', function (d) {
-            const changesetNumber = d.id;
-            const possibleVandalism = changesets[changesetNumber].possibleVandalism;
-            const deltaInNodesWays = changesets[changesetNumber].deltaInNodesWays;
-            const deltaInTags = changesets[changesetNumber].deltaInTags;
-            const deltaInIdWarningsAndResolves = changesets[changesetNumber].deltaInIdWarningsAndResolves;
-            const usedEditorWasId = changesets[changesetNumber].osmEditor.toLowerCase().startsWith("id");
-            // console.log('OSM Editor: ' + changesets[changesetNumber].osmEditor + ', usedEditorWasId: ' + usedEditorWasId);
+            const changesetData = changesets[d.id];
+            if (!changesetData) return "Changeset data not available for title.";
+
+            const possibleVandalism = changesetData.possibleVandalism;
+            const deltaInNodesWays = changesetData.deltaInNodesWays;
+            const deltaInTags = changesetData.deltaInTags;
+            const deltaInIdWarningsAndResolves = changesetData.deltaInIdWarningsAndResolves;
+            const usedEditorWasId = changesetData.osmEditor && changesetData.osmEditor.toLowerCase().startsWith("id");
+            // console.log('OSM Editor: ' + changesetData.osmEditor + ', usedEditorWasId: ' + usedEditorWasId);
             let titleText;
             //Only show the line "All resolved iD warnings..." if the used editor was actually iD
             if (possibleVandalism) {
-                titleText = `
-This changeset is potentially destructive!
-All added nodes/ways - All deleted nodes/ways: ${deltaInNodesWays}. ${deltaInNodesWays < vandalismThreshold ? "This is suspicious!" : ""}
-All added tags - All deleted tags: ${deltaInTags}. ${deltaInTags < vandalismThreshold ? "This is suspicious!" : ""}
-${usedEditorWasId ? `All resolved iD warnings - New iD warnings: ${deltaInIdWarningsAndResolves}. ${deltaInIdWarningsAndResolves < vandalismThreshold ? "This is suspicious!" : ""}` : ""}
-
-Reminder: It is often NOT necessary to delete elements in OSM. For example a closed shop should be tagged as 'disused:shop'. One day a new shop might open at the same exact lot and the tags can be updated. The same is true for demolished buildings ('demolished:building')
-`
+                titleText = `This changeset is potentially destructive!\nAll added nodes/ways - All deleted nodes/ways: ${deltaInNodesWays}. ${deltaInNodesWays < vandalismThreshold ? "This is suspicious!" : ""}\nAll added tags - All deleted tags: ${deltaInTags}. ${deltaInTags < vandalismThreshold ? "This is suspicious!" : ""}\n${usedEditorWasId ? `All resolved iD warnings - New iD warnings: ${deltaInIdWarningsAndResolves}. ${deltaInIdWarningsAndResolves < vandalismThreshold ? "This is suspicious!" : ""}` : ""}\n\nReminder: It is often NOT necessary to delete elements in OSM. For example a closed shop should be tagged as 'disused:shop'. One day a new shop might open at the same exact lot and the tags can be updated. The same is true for demolished buildings ('demolished:building')`;
             } else {
-                titleText = `
-This changeset looks good!
-All added nodes/ways - All deleted nodes/ways: ${deltaInNodesWays}. ${deltaInNodesWays < vandalismThreshold ? "This is suspicious!" : ""}
-All added tags - All deleted tags: ${deltaInTags}. ${deltaInTags < vandalismThreshold ? "This is suspicious!" : ""}
-${usedEditorWasId ? `All resolved iD warnings - New iD warnings: ${deltaInIdWarningsAndResolves}. ${deltaInIdWarningsAndResolves < vandalismThreshold ? "This is suspicious!" : ""}` : ""}
-`
+                titleText = `This changeset looks good!\nAll added nodes/ways - All deleted nodes/ways: ${deltaInNodesWays}. ${deltaInNodesWays < vandalismThreshold ? "This is suspicious!" : ""}\nAll added tags - All deleted tags: ${deltaInTags}. ${deltaInTags < vandalismThreshold ? "This is suspicious!" : ""}\n${usedEditorWasId ? `All resolved iD warnings - New iD warnings: ${deltaInIdWarningsAndResolves}. ${deltaInIdWarningsAndResolves < vandalismThreshold ? "This is suspicious!" : ""}` : ""}`;
             }
             return titleText;
-        })
+        });
     let trafficLight = trafficLightContainer.append("div")
-        .classed("traffic-light", true)
+        .classed("traffic-light", true);
     trafficLight.append("span")
         .attr('class', function (d) {
-            const changesetNumber = d.id;
-            const possibleVandalism = changesets[changesetNumber].possibleVandalism;
+            const possibleVandalism = changesets[d.id].possibleVandalism;
             return (possibleVandalism ? "gray" : "green");
         });
     trafficLight.append("span")
         .attr('class', function (d) {
-            const changesetNumber = d.id;
-            const possibleVandalism = changesets[changesetNumber].possibleVandalism;
+            const possibleVandalism = changesets[d.id].possibleVandalism;
             return (possibleVandalism ? "red" : "gray");
         });
 
     //Adds a span element for displaying a text bubble SVG symbol if this OSM changeset has received comments
     rl.append('span')
         .classed('text-bubble', true)
-        .filter(d => d.discussionCount > 0) // Filter this selection of spans based on their data
-        // Now, only operate on the spans that passed the filter:
+        .filter(d => d.discussionCount > 0) // Filter this span based on the data ('d.discussionCount' from 'bytime')
+        // If 'discussionCount' is larger 0 the 'span' html tag will pass the filter and the attributes below will be attached to it:
         .attr('title', d => `Changeset has ${d.discussionCount} comment${d.discussionCount !== 1 ? "s" : ""}`)
         .append('svg') // Append SVG only to filtered spans
         .classed('text-bubble-svg', true)
@@ -1183,18 +1207,18 @@ ${usedEditorWasId ? `All resolved iD warnings - New iD warnings: ${deltaInIdWarn
         .classed('user-name', true)
         .html(function (d) {
             // console.log(d.user);
-            return d.user;
+            return d.user; // d.user might contain HTML highlights from filtering
         })
         .attr('title', function (d) {
-            //Get unaltered user name from changesets object. The value in d.user might have html in it if filtered,
+            // Get unaltered user name from changesets. The value in d.user might have html in it if filtered,
             // e.g. <span class="highlight">rene</span>78. We don't want that in the title and href.
-            const userName = changesets[d.id].user;
-            return 'Go to OSM user page of ' + userName;
+            const unalteredUserName = changesets[d.id].user;
+            return 'Go to OSM user page of ' + unalteredUserName;
         })
         .attr('target', '_blank')
         .attr('href', function (d) {
-            const userName = changesets[d.id].user;//Get unaltered user name from changesets object.
-            return '//openstreetmap.org/user/' + userName;
+            const unalteredUserName = changesets[d.id].user;//Get unaltered user name from changesets object.
+            return '//openstreetmap.org/user/' + unalteredUserName;
         });
 
     //Timespan since changeset creation
@@ -1209,154 +1233,176 @@ ${usedEditorWasId ? `All resolved iD warnings - New iD warnings: ${deltaInIdWarn
     //Changeset text (was downloaded separately from OSM API)
     rl.append('div')
         .classed('changeset', true)
-        .html(function (d) {
+        .html(function (d) { // d.comment might contain HTML highlights from filtering
             return `<a href="https://openstreetmap.org/browse/changeset/${d.id}" target="_blank" class="comment" title="Go to OSM changeset page">${d.comment || '<span class="no-comment">—</span>'}</a>`;
         })
 }
 
 //Highlight clicked layer on map and in sidebar (happens when selecting element in sidebar or on map)
-function click(event, d) {
+// eventOrFeature can be a Leaflet GeoJSON feature (from map click) or null (from sidebar click/hover)
+// d can be changeset data (from sidebar click/hover) or null (from map click)
+function click(eventOrFeature, d) {
     // console.log("--- click Function Called ---");
-    // console.log("Argument 1 (event):", event); // This will be MouseEvent on sidebar hover and when clicking on leaflet element
-    // console.log("Argument 2 (d):", d);       // This SHOULD be the data object on sidebar. 'Undefined' when clicking on leaflet element
+    // console.log("Argument 1 (eventOrFeature):", eventOrFeature);
+    // console.log("Argument 2 (d):", d);
 
-    const changesetNumber = !d ? event.feature.feature.properties.meta.changeset : d.id;//'d.id' is available if changeset was selected in sidebar. 'd.feature...' is available in leaflet layer      
+    let changesetNumber;
+    if (d && typeof d.id !== 'undefined') { // Click/hover from sidebar (d is changeset data from bytime array)
+        changesetNumber = d.id;
+    } else if (eventOrFeature?.properties?.meta?.changeset) { // Click from map (eventOrFeature is a GeoJSON feature)
+        changesetNumber = eventOrFeature.properties.meta.changeset;
+    } else {
+        console.warn("Could not determine changeset number in click handler.", eventOrFeature, d);
+        return; // Cannot proceed without a changeset number
+    }
     // console.log('changesetNumber: ' + changesetNumber);
 
-    var results = d3.select('#results');
+    const results = d3.select('#results');
     results
         .selectAll('div.result')
-        .classed('active', function (_) {
+        .classed('active', function (dataItem) { // dataItem here is an element from the 'bytime' array
             //assign the class "active" if id of div element equals changeset number
-            return _.id == changesetNumber; //returns true if _.id equals the changeset number from above. Else it returns false.
+            return dataItem.id == changesetNumber; //returns true if dataItem.id equals the changeset number from above. Else it returns false.
         });
+
     //Reset the display of all map elements (to reset previously highlighted elements) 
-    leafletGeoJsonObject.resetStyle();
+    if (changesets.allLeafletLayers) {
+        changesets.allLeafletLayers.resetStyle(); // Reset all layers to their default style
+    }
 
-    //Highlight all layers with a certain changeset number.
-    leafletGeoJsonObject.eachLayer(function (l) {
-        // console.log(l.feature.properties.meta.changeset == changesetNumber);
-        if (l.feature.properties.meta.changeset == changesetNumber) {
-            l.setStyle({ color: '#008dff' });//Highlighting color: blue
-        }
-    });
+    //Highlight featureGroup belonging to the selected changeset number.
+    if (changesets[changesetNumber] && changesets[changesetNumber].leafletFeatureGroup) {
+        changesets[changesetNumber].leafletFeatureGroup.setStyle({ color: '#008dff' }); //Highlighting color: blue
+    }
 
-    //Make sure that sidebar is displayed
+    //Make sure that sidebar is displayed (if it was hidden)
     sidebar.classList.remove("hide");
+}
+
+// Helper function to highlight search term in a given text
+function highlightSearchTermInText(text, searchTerm) {
+    const originalText = text || ""; // Ensure we have a string, even if input is null/undefined
+    let highlightedText = originalText;
+    let matchFound = false;
+
+    // Only proceed if searchTerm is provided and text is not empty
+    if (searchTerm && originalText) {
+        // Check if the original text (case-insensitively) contains the search term
+        if (originalText.toLowerCase().includes(searchTerm.toLowerCase())) {
+            matchFound = true;
+            highlightedText = ''; // Rebuild with highlights
+            let lastIndex = 0;
+            // Safely handle any user input, even special regex symbols. Make it case-insensitive.
+            const regex = new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+            let match;
+            while ((match = regex.exec(originalText)) !== null) {
+                highlightedText += originalText.substring(lastIndex, match.index); // The original text up until the search term encounter...
+                highlightedText += `<mark>${match[0]}</mark>`; // ...plus the highlighted search term...
+                lastIndex = regex.lastIndex; // index at the end of the search term
+            }
+            highlightedText += originalText.substring(lastIndex); // ...plus the part of the text after the highlighted search term
+        }
+    }
+    return { highlightedText, matchFound };
 }
 
 //Filter changesets and update changesets list and GeoJSON data on map
 function filterChangesets() {
-    let foundChangesets = {};
+    let foundChangesets = {}; // This will store data for rendering (potentially with highlighted text)
     const searchTerm = document.querySelector(".search-changesets-field").value.toLowerCase();
-    // console.log(searchTerm);
-    const onlyRed = document.querySelector("#filter-red-checkbox").checked;//Is "onylRed" checkbox ticked?
-    // If searchTerm is empty -->
-    // If onlyRed tickbox is NOT ticked: Render the whole changeset object in list and on the map and quit this function
-    // If onlyRed tickbox IS ticked: Filter out all objects which look clean (i.e. likely no vandalism)
-    if (!searchTerm) {
-        let changesetToRender = {};
-        //if onlyRed is ticked --> filter out all changesets with "possibleVandalism=false"
-        if (onlyRed) {
-            let wholeChangesetWithOnlyRed = {};
-            for (const changesetId in changesets) {
-                if (changesets[changesetId].possibleVandalism) wholeChangesetWithOnlyRed[changesetId] = changesets[changesetId];
+    const onlyRed = document.querySelector("#filter-red-checkbox").checked;
+
+    // If searchTerm is empty AND "onlyRed" is not checked, show all changesets by writing all the data from 'changesets' object into 'foundChangesets'
+    if (!searchTerm && !onlyRed) {
+        for (const changesetId in changesets) {
+            // Ensure we are only processing actual changeset entries, not 'allLeafletLayers'
+            if (changesets.hasOwnProperty(changesetId) && changesetId !== 'allLeafletLayers') {
+                foundChangesets[changesetId] = changesets[changesetId]; // Use original data
             }
-            changesetToRender = wholeChangesetWithOnlyRed;
-        } else changesetToRender = changesets;
-
-        // console.table(changesetToRender);
-
-        renderChangesetsList(changesetToRender);//Render all changesets in list
-        displayGeoJson(changesetToRender);//Render map elements of all changesets
+        }
+        renderChangesetsList(foundChangesets);
+        displayGeoJson(foundChangesets); // Pass the same object, displayGeoJson will look up groups in changesets
         return;
     }
 
     for (const changesetId in changesets) {
-        // console.log(changesetId);
+        if (!changesets.hasOwnProperty(changesetId) || changesetId === 'allLeafletLayers') continue;
 
-        //Skip, if only changesets with "possibleVandalism" are supposed to be shown and this one has "possibleVandalism=false"
-        if (onlyRed && !changesets[changesetId].possibleVandalism) continue;
+        const currentChangesetData = changesets[changesetId]; // Original data
 
-        //1. Search within COMMENTS for search term
-        const commentToCheck = changesets[changesetId].comment;
-        // console.log(commentToCheck);
-        let modifiedComment = '';
-        let foundAt;
-        let start = 0;
-        let previousStart = 0;
-        let loopCounter = 0;
+        // Apply "onlyRed" filter first. If it's active and current changeset is not marked as 'possible vandalism', skip.
+        if (onlyRed && !currentChangesetData.possibleVandalism) continue;
 
-        while (foundAt !== -1) {
-            //In case user deletes all input in search field
-            if (!searchTerm) break;
+        let matchFoundBySearchTerm = false;
+        let modifiedComment = currentChangesetData.comment || ""; // Start with original or empty string
+        let modifiedUserName = currentChangesetData.user || "";   // Start with original or empty string
 
-            foundAt = commentToCheck.toLowerCase().indexOf(searchTerm, start);
-            modifiedComment += commentToCheck.slice((previousStart == 0 && loopCounter == 0) ? 0 : previousStart + searchTerm.length, (foundAt !== -1) ? foundAt : undefined);
-            if (foundAt !== -1) modifiedComment += `<span class='highlight'>${commentToCheck.slice(foundAt, foundAt + searchTerm.length)}</span>`;
-            // console.log(text.slice(foundAt, foundAt + searchTerm.length));
-            // console.log(modifiedComment);
-            // if (foundAt !== -1) findIndices.push(foundAt);
-            previousStart = foundAt;
-            start = foundAt + 1;
-            loopCounter++;
-        }
-        // console.log(modifiedComment);
-
-        //2. Search within USER NAME for search term
-        const userNameToCheck = changesets[changesetId].user;
-        let modifiedUserName = '';
-        start = 0;
-        previousStart = 0;
-        foundAt = 0;
-        loopCounter = 0;
-
-        while (foundAt !== -1) {
-            //In case user deletes all input in search field
-            if (!searchTerm) break;
-
-            foundAt = userNameToCheck.toLowerCase().indexOf(searchTerm, start);
-            modifiedUserName += userNameToCheck.slice((previousStart == 0 && loopCounter == 0) ? 0 : previousStart + searchTerm.length, (foundAt !== -1) ? foundAt : undefined);
-            if (foundAt !== -1) modifiedUserName += `<span class='highlight'>${userNameToCheck.slice(foundAt, foundAt + searchTerm.length)}</span>`;
-            // console.log(text.slice(foundAt, foundAt + searchTerm.length));
-            // console.log(modifiedComment);
-            // if (foundAt !== -1) findIndices.push(foundAt);
-            previousStart = foundAt;
-            start = foundAt + 1;
-            loopCounter++;
-        }
-        // console.log(modifiedUserName);
-
-        //Create entry in "foundChangesets" object if modified user name or comment is different than original one, i.e. it has <span> elements inside
-        if (modifiedComment !== commentToCheck || modifiedUserName !== userNameToCheck) {
-            foundChangesets[changesetId] = {
-                id: changesetId,
-                time: changesets[changesetId].time,
-                user: modifiedUserName,
-                comment: modifiedComment,
-                discussionCount: changesets[changesetId].discussionCount,
-                layers: changesets[changesetId].layers
+        if (searchTerm) { // Only perform search term matching if searchTerm is present
+            // 1. Search within COMMENTS for search term and get highlighted version
+            const commentResult = highlightSearchTermInText(currentChangesetData.comment, searchTerm);
+            modifiedComment = commentResult.highlightedText;
+            if (commentResult.matchFound) {
+                matchFoundBySearchTerm = true;
             }
+
+            // 2. Search within USER NAME for search term and get highlighted version
+            const userNameResult = highlightSearchTermInText(currentChangesetData.user, searchTerm);
+            modifiedUserName = userNameResult.highlightedText;
+            if (userNameResult.matchFound) {
+                matchFoundBySearchTerm = true;
+            }
+        }
+
+        // Determine if this changeset should be included in results:
+        // - If searchTerm is entered AND matchFoundBySearchTerm must be true.
+        // - If searchTerm is NOT entered BUT onlyRed IS (due to initial check)
+        if ((searchTerm && matchFoundBySearchTerm) || (!searchTerm && onlyRed)) {
+            foundChangesets[changesetId] = {
+                ...currentChangesetData, // Copy all original properties
+                user: modifiedUserName,    // Override with (potentially) highlighted user
+                comment: modifiedComment   // Override with (potentially) highlighted comment
+            };
         }
     }
     // console.table(foundChangesets);
-    renderChangesetsList(foundChangesets);
+    renderChangesetsList(foundChangesets); // Pass the object with potentially highlighted text
     displayGeoJson(foundChangesets);
 
     //Filter GeoJSON on map
-    function displayGeoJson(foundChangesets) {
-        //Remove old GeoJSON
-        leafletGeoJsonObject.eachLayer(function (l) {
-            map.removeLayer(l);
-        });
+    function displayGeoJson(fSets) { // fSets is the foundChangesets object
+        if (!changesets.allLeafletLayers) return;
 
-        //Add layers of filtered changesets back to the map
-        for (const changeset of Object.values(foundChangesets)) {
-            // console.log(changesets.layers);
-            for (let i = 0; i < changeset.layers.length; i++) {
-                map.addLayer(changeset.layers[i]);
+        // Clear layers. Important: The layers are just detached from the map. The reference to those layers
+        // inside 'changesets[csId].leafletFeatureGroup' is still intact.
+        changesets.allLeafletLayers.clearLayers();
+
+        // 1. Collect all Leaflet layer instances that should be visible from the filtered sets
+        const visibleLayers = [];
+        for (const csId in fSets) { // Iterate over the fSets (which are the filtered changesets)
+            if (fSets.hasOwnProperty(csId)) {
+                // Get the original changeset data from the main object to access its leafletFeatureGroup
+                const originalChangesetData = changesets[csId];
+                if (originalChangesetData && originalChangesetData.leafletFeatureGroup) {
+                    originalChangesetData.leafletFeatureGroup.eachLayer(layer => {
+                        visibleLayers.push(layer);
+                    });
+                }
             }
         }
+
+        // 2. Sort these visible layers using the same logic as your initial sort.
+        // The Leaflet layer instance (`layer`) has `layer.feature`.
+        visibleLayers.sort((layerA, layerB) => {
+            // Use your existing sortGeoJsonFeatures by passing the features
+            return sortGeoJsonFeatures(layerA.feature, layerB.feature);
+        });
+
+        // 3. Add the sorted layers back to the main display group
+        visibleLayers.forEach(layer => {
+            if (changesets.allLeafletLayers && typeof changesets.allLeafletLayers.addLayer === 'function') {
+                changesets.allLeafletLayers.addLayer(layer);
+            }
+        });
     }
 }
 
@@ -1427,8 +1473,7 @@ document.querySelector(".search-changesets-field").addEventListener("input", sho
 //Remove content of "filter changeset input" once X is clicked
 document.querySelector(".delete-filter-input").addEventListener("click", () => {
     document.querySelector(".search-changesets-field").value = "";
-    filterChangesets();//Show all changesets
-    document.querySelector(".delete-filter-input").classList.add("hide");//Hide X again
+    showHideCrossThenFilter(); // Call this to hide cross and re-filter (showing all)
 });
 
 //Only show changesets with red traffic light when clicking on the "filter red" checkbox

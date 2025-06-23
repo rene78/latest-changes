@@ -9,7 +9,7 @@ This JavaScript function calculates the approximate distance between two points 
 ```js
 function distance(λ1, φ1, λ2, φ2) {
     const R = 6371000;
-    Δλ = (λ2 - λ1) * Math.PI / 180;
+    const Δλ = (λ2 - λ1) * Math.PI / 180;
     φ1 = φ1 * Math.PI / 180;
     φ2 = φ2 * Math.PI / 180;
     const x = Δλ * Math.cos((φ1 + φ2) / 2);

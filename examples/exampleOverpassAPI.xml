@@ -448,7 +448,7 @@
 </action>
 <action type="modify">
 <old>
-  <way id="999999999" version="1" timestamp="2021-04-15T21:20:54Z" changeset="103017971" uid="257555" user="rene78">
+  <way id="2222222222" version="1" timestamp="2021-04-15T21:20:54Z" changeset="103017971" uid="257555" user="rene78">
     <bounds minlat="47.656" minlon="9.477" maxlat="47.6568163" maxlon="9.4785357"/>
     <nd ref="8633427174" lat="47.6568163" lon="9.4785357"/>
     <nd ref="5851708120" lat="47.656" lon="9.477"/>
@@ -457,7 +457,7 @@
   </way>
 </old>
 <new>
-  <way id="999999999" version="2" timestamp="2025-04-01T21:20:54Z" changeset="103017971" uid="257555" user="rene78">
+  <way id="2222222222" version="2" timestamp="2025-04-01T21:20:54Z" changeset="103017971" uid="257555" user="rene78">
     <bounds minlat="47.6566572" minlon="9.4775609" maxlat="47.6568163" maxlon="9.4785357"/>
     <nd ref="8633427174" lat="47.6568163" lon="9.4785357"/>
     <nd ref="5851708120" lat="47.6566572" lon="9.4775609"/>

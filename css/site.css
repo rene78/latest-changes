@@ -430,10 +430,6 @@ h2 select {
 /* #endregion */
 
 /* #region CSS RELATED TO FILTER CHANGESETS TOOLBAR */
-.highlight {
-  background-color: yellow;
-}
-
 .filter-container {
   padding: 5px 12px;
 }
