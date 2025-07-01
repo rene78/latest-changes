@@ -202,6 +202,8 @@ function interpolateColor(rgb1, rgb2, factor) {
 
 // Return color depending on age of changeset. New: bright red, old: dark red/gray
 function defineColor(date) {
+    // console.log('defineColor() called');
+
     // Ensure input 'date' is a Date object
     if (!(date instanceof Date)) {
         date = new Date(date); // Attempt to convert if not already a Date
@@ -258,7 +260,7 @@ function toggleWaitingScreen() {
 //On page load: Check if map is zoomed in enough. If yes: Download OSM changeset data from overpass
 const overpass_server = '//overpass-api.de/api/'; //'https://overpass.kumi.systems/api/';
 const vandalismThreshold = -3; //If 3 more elements or tags have been deleted than added, the traffic light will change to red
-const debugMode = false; //False (default): Do an API call to Overpass. True: Use locally saved xml files for debugging purposes
+const debugMode = false; //False (default): Do an API call to Overpass. True: Use locally saved xml files for debugging/development purposes
 
 // Reset AbortController to null during load of script. Needed to reset all Promise requests.
 window.currentAbortController = null;
@@ -375,8 +377,63 @@ function run() {
                 feature.properties.__is_old__ = true;
             });
 
+            //Combine old and new GeoJSON into one
+            let allGeojsonFeatures = [].concat(oldGeojson.features).concat(newGeojson.features);
+            // console.log(allGeojsonFeatures);
+
+            //Sort allGeojsonFeatures before writing it into the changesets object
+            allGeojsonFeatures.sort(sortGeoJsonFeatures); // Sort features before creating the Leaflet GeoJSON layer
+
+            //Options to create the GeoJSON layers on the map
+            const sharedGeoJsonOptions = {
+                onEachFeature: onEachFeature,
+                style: setStyle,
+                pointToLayer: function (feature, latlng) {
+                    return L.circleMarker(latlng, { radius: 8 });
+                }
+            };
+
+            //Add all GeoJSON features to the map and store them in the changesets object
+            changesets.allLeafletLayers = L.geoJSON(allGeojsonFeatures, sharedGeoJsonOptions).addTo(map);
+
             //Define what functionality is given to each polygon/way/marker
             function onEachFeature(feature, layer) {
+                // console.log(layer);
+
+                // Traverse all the layers that have been added to the map and create an entry for each changeset in 'changesets'
+                // Create a logical featureGroup for each changeset (not added to the map directly).
+                // This featureGroup can later be used to color all layers at once.
+
+                // Guard against features without changeset meta, which can happen if osmtogeojson couldn't associate them
+                if (!layer.feature.properties.meta || !layer.feature.properties.meta.changeset) {
+                    // console.warn("Feature without changeset meta:", l.feature);
+                    return;
+                }
+                const changesetNumber = layer.feature.properties.meta.changeset;
+
+                if (changesets[changesetNumber] === undefined) {
+                    //Note: The color for each changeset is calculated twice - here and in setStyle(). Not very clean. See if this redundancy can somehow be removed.
+                    const color = defineColor(new Date(layer.feature.properties.meta.timestamp));
+                    // console.log(color);
+
+                    changesets[changesetNumber] = {
+                        color,
+                        comment: '',
+                        deltaInIdWarningsAndResolves: 0, // Initialize
+                        deltaInNodesWays: 0,
+                        deltaInTags: 0,
+                        discussionCount: 0, // Initialize
+                        id: changesetNumber,
+                        leafletFeatureGroup: L.featureGroup(), // Logical group, not added to map
+                        osmEditor: '',
+                        possibleVandalism: false,
+                        time: new Date(layer.feature.properties.meta.timestamp),
+                        user: layer.feature.properties.meta.user
+                    };
+                }
+                //Add the layer to their respective changeset feature groups in changesets
+                changesets[changesetNumber].leafletFeatureGroup.addLayer(layer);
+
                 // Assign a unique layer ID to each Leaflet layer using the OSM feature ID, appended with 'o' for old features and 'n' for new ones.
                 const OsmIdOfHoveredElement = feature.properties.id;//OSM element ID
                 const isOld = feature.properties.__is_old__;
@@ -435,76 +492,26 @@ function run() {
 
                 //Change line weight back when feature loses focus
                 layer.on('mouseout', function (e) {
-                    // changesets.allLeafletLayers.resetStyle(layer); // More specific reset
                     layer.setStyle({ weight: 3 });
                     // The highlightTwinElementLocation function handles resetting the twin's style more comprehensively
                 });
             }
 
-            const sharedGeoJsonOptions = {
-                style: setStyle,
-                pointToLayer: function (feature, latlng) {
-                    return L.circleMarker(latlng, { radius: 8 });
-                },
-                onEachFeature: onEachFeature
-            };
-
             //Define style of GeoJSON elements
             function setStyle(f) {
+                // console.log('setStyle called');
+                const cs = changesets[f.properties.meta.changeset];
                 return {
-                    color: defineColor(new Date(f.properties.meta.timestamp)),
+                    // If specific color has already been defined in the 'changesets' object then use it. Else calculate in defineColor()
+                    // setStyle() is also called when using .resetStyle(). By saving the color in 'changesets' we can make sure that
+                    // the whole defineColor() does not have to be re-executed on .resetStyle().
+                    color: cs?.color !== undefined //"If cs exists, and it has a color property, use it. Otherwise, fall back."
+                        ? cs.color
+                        : defineColor(new Date(f.properties.meta.timestamp)),
                     opacity: f.properties.__is_old__ === true ? 0.2 : 1,
                     weight: 3
                 }
             };
-
-            //Combine old and new GeoJSON into one
-            let allGeojsonFeatures = [].concat(oldGeojson.features).concat(newGeojson.features);
-            // console.log(allGeojsonFeatures);
-
-            //Sort allGeojsonFeatures before writing it into the changesets object
-            allGeojsonFeatures.sort(sortGeoJsonFeatures); // Sort features before creating the Leaflet GeoJSON layer
-
-            //Add all GeoJSON features to the map and store them in the changesets object
-            changesets.allLeafletLayers = L.geoJSON(allGeojsonFeatures, sharedGeoJsonOptions).addTo(map);
-
-            //Traverse all the layers that have been added to the map and create an entry for each changeset in changesets
-            //Create a logical featureGroup for each changeset (not added to the map directly).
-            changesets.allLeafletLayers.eachLayer(function (l) {
-                // Guard against features without changeset meta, which can happen if osmtogeojson couldn't associate them
-                if (!l.feature.properties.meta || !l.feature.properties.meta.changeset) {
-                    // console.warn("Feature without changeset meta:", l.feature);
-                    return;
-                }
-                const changesetNumber = l.feature.properties.meta.changeset;
-
-                if (changesets[changesetNumber] === undefined) {
-
-                    changesets[changesetNumber] = {
-                        id: changesetNumber,
-                        time: new Date(l.feature.properties.meta.timestamp),
-                        user: l.feature.properties.meta.user,
-                        comment: '',
-                        deltaInNodesWays: 0,
-                        deltaInTags: 0,
-                        possibleVandalism: false,
-                        osmEditor: '',
-                        discussionCount: 0, // Initialize
-                        deltaInIdWarningsAndResolves: 0, // Initialize
-                        leafletFeatureGroup: L.featureGroup() // Logical group, not added to map here
-                    };
-                }
-                //Add the layer to their respective changeset feature groups in changesets
-                changesets[changesetNumber].leafletFeatureGroup.addLayer(l);
-            });
-
-            //Example 1: This is how to change the style of a specific changeset on the map
-            //const aSpecificChangeset = changesets[154564334].leafletFeatureGroup;
-            //aSpecificChangeset.setStyle({ color: 'pink', opacity: 1 });
-
-            //Example 2: Access a single geojson feature
-            //const aSpecificFeature = changesets.allLeafletLayers.getLayer('2222222222o');//the layer id got turned into a string after adding the letter as suffix, so do not forget the ''.
-            //aSpecificFeature.setStyle({ color: 'pink', opacity: 1 });
 
             //Change app display from "loading" to "ready"
             d3.select('#map').classed('faded', false);
@@ -1124,7 +1131,8 @@ function renderChangesetsList(changesetsToDisplay) {
         .append('div')
         .attr('class', 'result')
         .attr('title', 'Changeset is highlighted on map')
-        .style('color', d => defineColor(d.time))
+        // .style('color', d => defineColor(d.time))
+        .style('color', d => changesets[d.id].color)
         .on('click', (event, d) => click(null, d))//Highlight changeset on click (desktop/mobile) - Pass null for feature, d for data
         .on('mouseover', (event, d) => click(null, d));//Highlight changeset on mouseover (desktop) - Pass null for feature, d for data
     // console.log(rl);
@@ -1257,6 +1265,14 @@ function click(eventOrFeature, d) {
     }
     // console.log('changesetNumber: ' + changesetNumber);
 
+    //Reset style of previously highlighted changeset
+    //The code 'changesets.allLeafletLayers.resetStyle();' is possible, too. But for this setStyle() is called for every element on the map.
+    //Computationally demanding for no added value since we only need to reset the color of the previously highlighted featureGroup.
+    highlightedChangeset = changesets.highlightedChangeset;
+    // console.log(highlightedChangeset);
+    if (highlightedChangeset) changesets[highlightedChangeset].leafletFeatureGroup.setStyle({ color: changesets[highlightedChangeset].color });//Change color back to shade of red
+    changesets.highlightedChangeset = changesetNumber;//Change highlighted changeset to the currently selected one.
+
     const results = d3.select('#results');
     results
         .selectAll('div.result')
@@ -1264,11 +1280,6 @@ function click(eventOrFeature, d) {
             //assign the class "active" if id of div element equals changeset number
             return dataItem.id == changesetNumber; //returns true if dataItem.id equals the changeset number from above. Else it returns false.
         });
-
-    //Reset the display of all map elements (to reset previously highlighted elements) 
-    if (changesets.allLeafletLayers) {
-        changesets.allLeafletLayers.resetStyle(); // Reset all layers to their default style
-    }
 
     //Highlight featureGroup belonging to the selected changeset number.
     if (changesets[changesetNumber] && changesets[changesetNumber].leafletFeatureGroup) {
