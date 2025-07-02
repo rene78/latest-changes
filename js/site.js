@@ -483,8 +483,20 @@ function run() {
                             // console.log('Name of leafletLayerOfTwin: ' + OsmIdOfHoveredElement + (isOld ? 'n' : 'o'));
                             if (!leafletLayerOfTwin) return; // Return if there is no twin. Should never happen.
 
-                            //Compare length and position of hovered and twin element.
-                            const geometryIsDifferent = checkIfLengthOfLineOrPolygonHasChanged(layer, leafletLayerOfTwin);
+                            // Compare length and position of hovered and twin element. Check if comparison for those features has happened before.
+                            // If yes: Use stored value. If no: calculate and store result in layer.
+                            const geometryIsDifferent =
+                                layer.feature.geometryIsDifferent !== undefined
+                                    ? layer.feature.geometryIsDifferent
+                                    : (
+                                        // Execute length comparison and write result into 'feature.geometryIsDifferent' property of new and old layer.
+                                        // For subsequent calls the length calculation does not have to be performed again
+                                        layer.feature.geometryIsDifferent =
+                                        leafletLayerOfTwin.feature.geometryIsDifferent =
+                                        checkIfLengthOfLineOrPolygonHasChanged(layer, leafletLayerOfTwin)
+                                    );
+                            // console.log(layer.feature, leafletLayerOfTwin.feature);
+                            // If the geometry of old and new layers are different highlight the twin layer.
                             if (geometryIsDifferent) highlightTwinElementLocation(layer, leafletLayerOfTwin);
                         }
                     }
@@ -530,6 +542,7 @@ function run() {
             //return true: Geometry has been changed
             //return false: Geometry is unchanged
             function checkIfLengthOfLineOrPolygonHasChanged(leafletLayerOfHoveredElement, leafletLayerOfTwin) {
+                // console.log('checkIfLengthOfLineOrPolygonHasChanged called');
                 /*
                 //The length check can be computationally demanding on complex LineStrings and polgyons. Thus simply highlight all
                 //twin elements - regardless of whether the geometry has been changed or not - if node count is greater than 50.
@@ -1065,28 +1078,16 @@ function run() {
    3. Points
 */
 function sortGeoJsonFeatures(a, b) { // a and b are GeoJSON features
-    const typeOrder = { 'Polygon': 1, 'MultiPolygon': 1, 'LineString': 2, 'Point': 3 };
+    const typeOrder = { 'Polygon': 1, 'LineString': 2, 'Point': 3 };
     const aType = a.geometry.type;
     const bType = b.geometry.type;
     if (typeOrder[aType] !== typeOrder[bType]) {
         return typeOrder[aType] - typeOrder[bType];
     }
-    if (aType === 'Polygon' || aType === 'MultiPolygon') {
+    if (aType === 'Polygon') {
         const aArea = calculateArea(a.geometry);
         const bArea = calculateArea(b.geometry);
         return bArea - aArea; // Largest first (Reverse the subtraction for descending order)
-    }
-    return 0;
-};
-
-//Check if Polygon or Multipolygon (can actually be removed because no Multipolygons in dataset.)
-function calculateArea(geometry) {
-    if (geometry.type === 'Polygon') {
-        return polygonArea(geometry.coordinates[0]);
-    }
-    if (geometry.type === 'MultiPolygon') {
-        return geometry.coordinates.reduce((acc, polygon) =>
-            acc + polygonArea(polygon[0]), 0);
     }
     return 0;
 };
@@ -1095,14 +1096,16 @@ function calculateArea(geometry) {
 This so called 'Shoelace formula' does not return accurate results in m² because it only works for planar
 2D coordinates. Our geo coordinates are on a sphere though (in degrees). Since we only want to compare
 the relative size of each polygon for sorting purposes the formula is sufficient.*/
-function polygonArea(coords) {
+function calculateArea(geometry) {
     let area = 0;
+    const coords = geometry.coordinates[0];
     for (let i = 0; i < coords.length; i++) {
         const j = (i + 1) % coords.length; //j is always x+1 except on the last element of the array where it is 0.
         const [xi, yi] = coords[i];
         const [xj, yj] = coords[j];
         area += xi * yj - xj * yi;
     }
+    // console.log(area);
     return Math.abs(area) / 2;
 };
 
@@ -1401,7 +1404,7 @@ function filterChangesets() {
             }
         }
 
-        // 2. Sort these visible layers using the same logic as your initial sort.
+        // 2. Sort these visible layers using the same logic as the initial sort.
         // The Leaflet layer instance (`layer`) has `layer.feature`.
         visibleLayers.sort((layerA, layerB) => {
             // Use your existing sortGeoJsonFeatures by passing the features
