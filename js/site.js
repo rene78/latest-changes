@@ -192,9 +192,9 @@ function interpolateColor(rgb1, rgb2, factor) {
     const [rgb1R, rgb1G, rgb1B] = rgb1.match(/\d+/g).map(Number);
     const [rgb2R, rgb2G, rgb2B] = rgb2.match(/\d+/g).map(Number);
 
-    const r = rgb1R + (rgb2R - rgb1R) * factor;
-    const g = rgb1G + (rgb2G - rgb1G) * factor;
-    const b = rgb1B + (rgb2B - rgb1B) * factor;
+    const r = Math.round(rgb1R + (rgb2R - rgb1R) * factor);
+    const g = Math.round(rgb1G + (rgb2G - rgb1G) * factor);
+    const b = Math.round(rgb1B + (rgb2B - rgb1B) * factor);
 
     // console.log(`rgb(${r},${g},${b})`);
     return `rgb(${r},${g},${b})`;
