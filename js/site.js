@@ -188,10 +188,14 @@ function updateMap() {
 * @returns {string} - Interpolated rgb color string.
 */
 function interpolateColor(rgb1, rgb2, factor) {
-    // get r, g, b values as numbers
+    // Get r, g, b values as numbers
+    // Explanation:
+    // rgb1.match(/\d+/g) returns an array with the 3 numbers as strings, e.g. ['119', '119', '119']
+    // .map(Number) is a shorthand for ['119', '119', '119'].map(str => Number(str)) and converts all strings to numbers
     const [rgb1R, rgb1G, rgb1B] = rgb1.match(/\d+/g).map(Number);
     const [rgb2R, rgb2G, rgb2B] = rgb2.match(/\d+/g).map(Number);
 
+    // Find the 'in-between-color' for r, g and b based on the age of the changeset.
     const r = Math.round(rgb1R + (rgb2R - rgb1R) * factor);
     const g = Math.round(rgb1G + (rgb2G - rgb1G) * factor);
     const b = Math.round(rgb1B + (rgb2B - rgb1B) * factor);
@@ -1245,7 +1249,7 @@ function renderChangesetsList(changesetsToDisplay) {
     rl.append('div')
         .classed('changeset', true)
         .html(function (d) { // d.comment might contain HTML highlights from filtering
-            return `<a href="https://openstreetmap.org/browse/changeset/${d.id}" target="_blank" class="comment" title="Go to OSM changeset page">${d.comment || '<span class="no-comment">—</span>'}</a>`;
+            return `<a href="https://openstreetmap.org/browse/changeset/${d.id}" target="_blank" class="comment" title="Go to OSM changeset page\n\n${changesets[d.id].comment}">${d.comment || '<span class="no-comment">—</span>'}</a>`;
         })
 }
 

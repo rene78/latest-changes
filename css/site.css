@@ -162,10 +162,18 @@ a:visited {
   opacity: .3;
 }
 
+.changesets {
+  flex: 0 1 310px;
+  overflow: auto;
+  height: 100vh;
+}
+
 /* Make sure that sidebar is shown on small screens and hide the "toggle sidebar"-icon */
 @media (max-width: 600px) {
   .changesets {
     display: block;
+    flex: 1 1 auto;
+    height: 50vh;
   }
 
   /* Hide toggle sidebar icon on small screens*/
@@ -300,73 +308,17 @@ changesets list gets the whole width on small screens*/
   /* padding: 0px 0px 5px 20px; */
   height: 35px;
   overflow: hidden;
-}
-
-.changeset a {
-  text-decoration: none;
-}
-
-.changeset a.comment:first-letter {
-  text-transform: capitalize;
-}
-
-.result.active .changeset,
-.result:hover .changeset {
-  height: auto;
-  min-height: 35px;
-}
-
-.changeset:first-line {
   font-weight: bold;
   font-size: 18px;
 }
 
-.reveal {
-  visibility: hidden;
-}
-
-a.reveal {
+.changeset a {
   text-decoration: none;
-  opacity: 0.6;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  display: block;
+  white-space: nowrap;
 }
-
-a.reveal:hover {
-  text-decoration: underline;
-  opacity: 1;
-}
-
-.result.active .reveal,
-.result:hover .reveal {
-  visibility: visible;
-}
-
-h2 select {
-  width: auto;
-  height: auto;
-  border: 0;
-  background: transparent;
-  color: black;
-  font-weight: bold;
-  font-size: 28px;
-  padding: 0;
-  margin: 0;
-  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  vertical-align: baseline;
-}
-
-.col {
-  flex: 0 1 310px;
-  overflow: auto;
-  height: 100vh;
-}
-
-@media (max-width: 600px) {
-  .col {
-    flex: 1 1 auto;
-    height: 50vh;
-  }
-}
-
 
 /* Custom scroll bar
   ------------------------------------------------------- */
