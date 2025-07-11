@@ -526,6 +526,12 @@ changesets list gets the whole width on small screens*/
   pointer-events: none;
 }
 
+@media (max-width: 600px) {
+  #loading-animation {
+    top: 0%;
+  }
+}
+
 @keyframes spin {
   0% {
     transform: rotate(0deg);
