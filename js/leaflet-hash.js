@@ -85,6 +85,8 @@
       }
       return this.map.on("baselayerchange", function(e) {
         var pstate, _ref;
+        //without the guard below leaflet-hash throws an error.
+        if (!_this.options.lc) return
         _this.base = (_ref = _this.options.lc._layers[e.layer._leaflet_id].name).replace.apply(_ref, _this.options.formatBase);
         pstate = _this.formatState();
         if (history.pushState) {

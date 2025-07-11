@@ -479,6 +479,7 @@ changesets list gets the whole width on small screens*/
 }
 
 #map {
+  background: white;
   position: relative;
   height: 100%;
   width: 100%;
