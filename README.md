@@ -18,11 +18,11 @@ Newer edits are displayed in more saturated colors than older modifications. Del
 A simple tool that verifies the integrity of downloaded changesets. It calculates the total number of elements, tags and iD warnings added and deleted in each changeset. If the net change is below a specified threshold (currently -3), a red traffic light alert is triggered to notify users about the suspicious changeset.
 
 ### Examples
-| **Type**      | **Case**                                                                        | **Sum**| **Result**    |
+|   Type        |   Case                                                                          |   Sum  |   Result      |
 |---------------|---------------------------------------------------------------------------------|--------|:-------------:|
-| **Element**   | A user added **one** new supermarket and deleted **two** roads.                 |     -1 | 🟢⚫️          |
-| **Tag**       | A user added **three** tags to a restaurant but deleted **seven** of a library. |     -4 | ⚫️🔴          |
-| **iD Warning**| A user fixed **one** iD warning but caused **five** new ones.                   |     -4 | ⚫️🔴          |
+| Element       | A user added **one** new supermarket and deleted **two** roads.                 |     -1 | 🟢⚫️          |
+| Tag           | A user added **three** tags to a restaurant but deleted **seven** of a library. |     -4 | ⚫️🔴          |
+| iD Warning    | A user fixed **one** iD warning but caused **five** new ones.                   |     -4 | ⚫️🔴          |
 
 # Limitations
 - The site currently doesn't show OSM modifications of relation objects.
