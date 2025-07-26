@@ -51,7 +51,7 @@ L.control.locate({
 }).addTo(map);
 
 //Toggle sidebar button on map
-let sidebar = document.querySelector(".changesets");
+let sidebar = document.querySelector(".sidebar");
 L.Control.toggleSidebarButton = L.Control.extend(
     {
         options:
