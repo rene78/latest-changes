@@ -283,7 +283,7 @@ function toggleWaitingScreen() {
 //On page load: Check if map is zoomed in enough. If yes: Download OSM changeset data from overpass
 const overpass_server = '//overpass-api.de/api/'; //'https://overpass.kumi.systems/api/';
 const vandalismThreshold = -3; //If 3 more elements or tags have been deleted than added, the traffic light will change to red
-const debugMode = false; //False (default): Do an API call to Overpass. True: Use locally saved xml files for debugging/development purposes
+const debugMode = true; //False (default): Do an API call to Overpass. True: Use locally saved xml files for debugging/development purposes
 
 // Reset AbortController to null during load of script. Needed to reset all Promise requests.
 window.currentAbortController = null;
@@ -1277,8 +1277,8 @@ function renderChangesetsList(changesetsToDisplay) {
 // d can be changeset data (from sidebar click/hover) or null (from map click)
 function click(eventOrFeature, d) {
     // console.log("--- click Function Called ---");
-    // console.log("Argument 1 (eventOrFeature):", eventOrFeature);
-    // console.log("Argument 2 (d):", d);
+    console.log("Argument 1 (eventOrFeature):", eventOrFeature);
+    console.log("Argument 2 (d):", d);
 
     let changesetNumber;
     if (d && typeof d.id !== 'undefined') { // Click/hover from sidebar (d is changeset data from bytime array)
@@ -1301,9 +1301,9 @@ function click(eventOrFeature, d) {
 
     const results = d3.select('#results');
     results
-        .selectAll('div.result')
+        .selectAll('li.result')
         .classed('active', function (dataItem) { // dataItem here is an element from the 'bytime' array
-            //assign the class "active" if id of div element equals changeset number
+            //assign the class "active" if id of li element equals changeset number
             return dataItem.id == changesetNumber; //returns true if dataItem.id equals the changeset number from above. Else it returns false.
         });
 
