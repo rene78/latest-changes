@@ -283,7 +283,7 @@ function toggleWaitingScreen() {
 //On page load: Check if map is zoomed in enough. If yes: Download OSM changeset data from overpass
 const overpass_server = '//overpass-api.de/api/'; //'https://overpass.kumi.systems/api/';
 const vandalismThreshold = -3; //If 3 more elements or tags have been deleted than added, the traffic light will change to red
-const debugMode = true; //False (default): Do an API call to Overpass. True: Use locally saved xml files for debugging/development purposes
+const debugMode = false; //False (default): Do an API call to Overpass. True: Use locally saved xml files for debugging/development purposes
 
 // Reset AbortController to null during load of script. Needed to reset all Promise requests.
 window.currentAbortController = null;
