@@ -1277,8 +1277,8 @@ function renderChangesetsList(changesetsToDisplay) {
 // d can be changeset data (from sidebar click/hover) or null (from map click)
 function click(eventOrFeature, d) {
     // console.log("--- click Function Called ---");
-    console.log("Argument 1 (eventOrFeature):", eventOrFeature);
-    console.log("Argument 2 (d):", d);
+    // console.log("Argument 1 (eventOrFeature):", eventOrFeature);
+    // console.log("Argument 2 (d):", d);
 
     let changesetNumber;
     if (d && typeof d.id !== 'undefined') { // Click/hover from sidebar (d is changeset data from bytime array)
