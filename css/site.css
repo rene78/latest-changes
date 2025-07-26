@@ -183,15 +183,13 @@ a:visited {
 }
 
 #results {
+  list-style-type: none;
+  margin: 0;
   padding: 5px;
 }
 
 .result {
   border-bottom: 1px solid #eee;
-}
-
-.result {
-  /* padding: 5px 0 0 0; */
   transition: background-color .2s ease-in-out;
   -moz-transition: background-color .2s ease-in-out;
   -webkit-transition: background-color .2s ease-in-out;

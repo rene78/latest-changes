@@ -158,9 +158,9 @@ const osmCartoLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.pn
 const whiteTileUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAPAAAADwCAIAAADYVYZuAAAAKUlEQVR4nO3BMQEAAAwCoNm/9HIwAAAAAAAAAAAAAAAAAAAAAAAAAHwFtXIAARgZGQoAAAAASUVORK5CYII=";
 
 const whiteTileLayer = L.tileLayer(whiteTileUrl, {
-  tileSize: 256,
-  maxZoom: 21,
-  attribution: ''
+    tileSize: 256,
+    maxZoom: 21,
+    attribution: ''
 });
 
 const baseMaps = {
@@ -1149,12 +1149,12 @@ function renderChangesetsList(changesetsToDisplay) {
     //From here onwards the creation of the changesets section starts
     const results = d3.select('#results').html("");//Select and Clear the Results Container
     const allresults = results
-        .selectAll('div.result')//Since div.results is nonexistent at this point in time D3 creates an empty selection
+        .selectAll('li.result')//Since li.results is nonexistent at this point in time D3 creates an empty selection
         .data(bytime, d => d.id);//Bind data
     // console.log(allresults);
     //Below a single changeset div container 'rl' with all its content (e.g. loupe, traffic light, username, ...) is created.
     const rl = allresults.enter()
-        .append('div')
+        .append('li')
         .attr('class', 'result')
         .attr('title', 'Changeset is highlighted on map')
         // .style('color', d => defineColor(d.time))

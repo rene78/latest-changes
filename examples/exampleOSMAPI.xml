@@ -85,4 +85,4 @@
   <tag k="source" v="Esri World Imagery; Bing"/>
 </changeset>
 </osm>
-<!-- Example response from the OSM API which is called in the 2 second API query in site.js -->
+<!-- Example response from the OSM API which is called in the 2nd API query in site.js -->
