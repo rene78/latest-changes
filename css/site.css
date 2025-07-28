@@ -189,6 +189,11 @@ a:visited {
 }
 
 .result {
+  display: grid;
+  grid-template-columns: 0fr 0fr 0fr auto auto 40px;
+  /* | Loupe | Traffic light | Text bubble | User name | Age | Arrow */
+  grid-template-rows: auto auto;
+
   border-bottom: 1px solid #eee;
   transition: background-color .2s ease-in-out;
   -moz-transition: background-color .2s ease-in-out;
@@ -204,14 +209,11 @@ a:visited {
   color: #008dff !important;
 }
 
-.result .date {
-  padding-left: 8px;
-  text-decoration: underline dotted;
-  cursor: help;
-}
-
 .result .zoom {
-  float: left;
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  justify-content: center;
+
   display: flex;
   align-items: center;
   height: 30px;
@@ -243,7 +245,13 @@ a:visited {
 }
 
 .traffic-light-container {
-  display: inline-block;
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  justify-content: left;
+
+  /* display: inline-block; */
   margin-right: 3px;
   cursor: help;
 }
@@ -279,6 +287,12 @@ a:visited {
 }
 
 .result .text-bubble {
+  grid-column: 3;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
   cursor: help;
 }
 
@@ -288,29 +302,78 @@ a:visited {
   margin-right: 2px;
 }
 
-/*In order to avoid that 'user name' and 'time since creation' jumps to a second line the
-user name is truncated if it takes up more than 110px. Only on large screens since the
-changesets list gets the whole width on small screens*/
-@media (min-width: 601px) {
-  .user-name {
-    overflow: hidden;
-    display: inline-block;
-    max-width: 105px;
-    text-overflow: ellipsis;
-    vertical-align: bottom;
-    white-space: nowrap;
-  }
+.container-name-date {
+  grid-column: 4 / span 2;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0; /* prevents flex item overflow issues */
+  margin-right: 8px;
 }
 
-.changeset {
-  /* padding: 0px 0px 5px 20px; */
-  height: 35px;
+/*In order to avoid that 'user name' and 'time since creation' jumps to a second line the
+user name is truncated if it takes up too much space*/
+.user-name {
+  flex: 1 1 0;
+  min-width: 0; /* prevents flex item overflow issues */
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.result .date {
+  flex: 0 0 auto;
+  white-space: nowrap;
+
+  padding-left: 8px;
+  text-decoration: underline dotted;
+  cursor: help;
+}
+
+.result .arrow {
+  grid-column: 6;
+  grid-row: 1 / span 2;
+  justify-content: center;
+  display: flex;
+  align-items: center;
+  height: 30px;
+  width: 30px;
+  padding: 5px;
+  border-radius: 50%;
+  margin-top: 5px;
+  background-color: #e5e5e5;
+  stroke: #777;
+  box-shadow: 0 2px 4px darkslategrey;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.result .arrow:active {
+  box-shadow: 0 0 2px darkslategray;
+  transform: translateY(2px);
+}
+
+.result .arrow:hover {
+  background-color: #eee;
+}
+
+.arrow-up-svg {
+  width: 24px;
+  height: 24px;
+}
+
+.changeset-container {
+  grid-column: 2 / span 4;
+  grid-row: 2;
+  overflow: hidden;
+
+  /* height: 35px; */
+  /* overflow: hidden; */
   font-weight: bold;
   font-size: 18px;
 }
 
-.changeset a {
+.changeset-container a {
   text-decoration: none;
   text-overflow: ellipsis;
   overflow: hidden;

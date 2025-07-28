@@ -283,7 +283,7 @@ function toggleWaitingScreen() {
 //On page load: Check if map is zoomed in enough. If yes: Download OSM changeset data from overpass
 const overpass_server = '//overpass-api.de/api/'; //'https://overpass.kumi.systems/api/';
 const vandalismThreshold = -3; //If 3 more elements or tags have been deleted than added, the traffic light will change to red
-const debugMode = false; //False (default): Do an API call to Overpass. True: Use locally saved xml files for debugging/development purposes
+const debugMode = true; //False (default): Do an API call to Overpass. True: Use locally saved xml files for debugging/development purposes
 
 // Reset AbortController to null during load of script. Needed to reset all Promise requests.
 window.currentAbortController = null;
@@ -1157,7 +1157,6 @@ function renderChangesetsList(changesetsToDisplay) {
         .append('li')
         .attr('class', 'result')
         .attr('title', 'Changeset is highlighted on map')
-        // .style('color', d => defineColor(d.time))
         .style('color', d => changesets[d.id].color)
         .on('click', (event, d) => click(null, d))//Highlight changeset on click (desktop/mobile) - Pass null for feature, d for data
         .on('mouseover', (event, d) => click(null, d));//Highlight changeset on mouseover (desktop) - Pass null for feature, d for data
@@ -1226,7 +1225,7 @@ function renderChangesetsList(changesetsToDisplay) {
         });
 
     //Adds a span element for displaying a text bubble SVG symbol if this OSM changeset has received comments
-    rl.append('span')
+    rl.append('div')
         .classed('text-bubble', true)
         .filter(d => d.discussionCount > 0) // Filter this span based on the data ('d.discussionCount' from 'bytime')
         // If 'discussionCount' is larger 0 the 'span' html tag will pass the filter and the attributes below will be attached to it:
@@ -1236,8 +1235,12 @@ function renderChangesetsList(changesetsToDisplay) {
         .append('use')
         .attr('href', 'img/icons.svg#speech-bubble');
 
+    //Container for name and age of changeset
+    let containerNameDate = rl.append('div')
+        .classed('container-name-date', true);
+
     //User name.
-    rl.append('a')
+    containerNameDate.append('a')
         .classed('user-name', true)
         .html(function (d) {
             // console.log(d.user);
@@ -1256,7 +1259,7 @@ function renderChangesetsList(changesetsToDisplay) {
         });
 
     //Timespan since changeset creation
-    rl.append('span')
+    containerNameDate.append('span')
         .attr('title', function (d) {
             return moment(d.time).format('MMM Do YYYY, h:mm:ss a');
         })
@@ -1264,12 +1267,26 @@ function renderChangesetsList(changesetsToDisplay) {
             return moment(d.time).fromNow();
         });
 
-    //Changeset text (was downloaded separately from OSM API)
+    //Arrow to expand changeset information
     rl.append('div')
-        .classed('changeset', true)
+        .classed('arrow', true)
+        .append('svg')
+        .classed('arrow-up-svg', true)
+        .append('use')
+        .attr('href', 'img/icons.svg#arrow-up');
+
+    //Changeset container
+    let changesetContainer = rl.append('div')
+        .classed('changeset-container', true)
+        //Changeset title (was downloaded separately from OSM API)
         .html(function (d) { // d.comment might contain HTML highlights from filtering
             return `<a href="https://openstreetmap.org/browse/changeset/${d.id}" target="_blank" class="comment" title="Go to OSM changeset page\n\n${changesets[d.id].comment}">${d.comment || '<span class="no-comment">—</span>'}</a>`;
-        })
+        });
+
+    //All changeset details which are hidden by default
+    changesetContainer.append('div')
+        .classed('changeset-details-container', true)
+        .text('The changeset details will go into divs within this container.');
 }
 
 //Highlight clicked layer on map and in sidebar (happens when selecting element in sidebar or on map)
