@@ -17,7 +17,7 @@ body {
 a,
 a:hover,
 a:visited {
-  text-decoration: underline;
+  /* text-decoration: underline; */
   color: inherit;
 }
 
@@ -90,18 +90,19 @@ a:visited {
   margin: 0px auto;
 }
 
-.heading h3 {
-  font-size: 20px;
-  line-height: 1.5em;
-  position: absolute;
-  left: 70px;
-  top: 0px;
-  margin: 0;
+.logo-latest-changes {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  font-size: 25px;
+  /* gap: 8px; */
+  margin: 0px 10px;
+  font-weight: bold;
 }
 
 #clock {
-  width: 60px;
-  height: 60px;
+  width: 30px;
+  height: 30px;
 }
 
 .heading select {
@@ -365,7 +366,8 @@ user name is truncated if it takes up too much space*/
   grid-column: 2 / span 4;
   grid-row: 2;
   overflow: hidden;
-  height: calc-size(max-content, size); /* calc-size is only a draft as of 2025-07. Limited browser compatibility */
+  height: calc-size(max-content, size);
+  /* calc-size is only a draft as of 2025-07. Limited browser compatibility */
   transition: height 0.3s ease;
 }
 

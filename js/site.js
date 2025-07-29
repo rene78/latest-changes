@@ -1303,7 +1303,7 @@ function renderChangesetsList(changesetsToDisplay) {
         .classed('changeset-container hidden', true)
         //Changeset title (was downloaded separately from OSM API)
         .html(function (d) { // d.comment might contain HTML highlights from filtering
-            return `<a href="https://openstreetmap.org/browse/changeset/${d.id}" target="_blank" class="comment truncated" title="Go to OSM changeset page\n\n${changesets[d.id].comment}">${d.comment || '<span class="no-comment">—</span>'}</a>`;
+            return `<a href="https://openstreetmap.org/browse/changeset/${d.id}" target="_blank" class="comment truncated" title="Go to OSM changeset page">${d.comment || '<span class="no-comment">—</span>'}</a>`;
         });
 
     //All changeset details which are hidden by default
