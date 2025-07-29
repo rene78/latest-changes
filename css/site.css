@@ -5,11 +5,7 @@ body {
 }
 
 .container {
-  /* margin: 0 auto;
-  overflow: hidden; */
   display: flex;
-  /* flex-wrap: wrap; */
-  /* max-width: 100%; */
 }
 
 @media (max-width: 600px) {
@@ -91,13 +87,7 @@ a:visited {
   width: 293px;
   height: auto;
   padding: 5px 0;
-}
-
-/* Center the heading on small screens */
-@media (max-width: 600px) {
-  .heading {
-    margin: 0px auto;
-  }
+  margin: 0px auto;
 }
 
 .heading h3 {
@@ -307,7 +297,8 @@ a:visited {
   grid-row: 1;
   display: flex;
   align-items: center;
-  min-width: 0; /* prevents flex item overflow issues */
+  min-width: 0;
+  /* prevents flex item overflow issues */
   margin-right: 8px;
 }
 
@@ -315,7 +306,8 @@ a:visited {
 user name is truncated if it takes up too much space*/
 .user-name {
   flex: 1 1 0;
-  min-width: 0; /* prevents flex item overflow issues */
+  min-width: 0;
+  /* prevents flex item overflow issues */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -360,25 +352,41 @@ user name is truncated if it takes up too much space*/
 .arrow-up-svg {
   width: 24px;
   height: 24px;
+  transition: transform 0.3s ease;
+  transform: rotate(0deg);
+}
+
+.arrow-up-svg.rotated {
+  transform: rotate(180deg);
+  /* Turn arrow counterclockwise when expanding */
 }
 
 .changeset-container {
   grid-column: 2 / span 4;
   grid-row: 2;
   overflow: hidden;
+  height: calc-size(max-content, size); /* calc-size is only a draft as of 2025-07. Limited browser compatibility */
+  transition: height 0.3s ease;
+}
 
-  /* height: 35px; */
-  /* overflow: hidden; */
+.changeset-container.hidden {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  height: 30px;
+}
+
+.changeset-container .comment {
+  text-decoration: none;
+  overflow: hidden;
+  display: block;
+  white-space: normal;
   font-weight: bold;
   font-size: 18px;
 }
 
-.changeset-container a {
-  text-decoration: none;
-  text-overflow: ellipsis;
-  overflow: hidden;
-  display: block;
+.changeset-container .comment.truncated {
   white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 /* Custom scroll bar
@@ -386,12 +394,6 @@ user name is truncated if it takes up too much space*/
 /* Designing for scroll-bar */
 ::-webkit-scrollbar {
   width: 6px;
-}
-
-/*Increase size of scroll bar on hover*/
-*:hover::-webkit-scrollbar {
-  width: auto;
-  /* height: 10px; */
 }
 
 /* Track */

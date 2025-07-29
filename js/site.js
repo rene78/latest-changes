@@ -1270,6 +1270,29 @@ function renderChangesetsList(changesetsToDisplay) {
     //Arrow to expand changeset information
     rl.append('div')
         .classed('arrow', true)
+        .on('click', function (event, d) {
+            //Element related to the arrow animation
+            const arrowDiv = d3.select(this);  // 'this' refers to the clicked element
+            const arrowSvg = arrowDiv.select('svg').node(); // grab the SVG node inside the arrow div
+
+            //Elements related to the expansion of the changeset details
+            const thisResult = this.closest('.result'); // find parent element
+            const changesetComment = thisResult.querySelector('.comment'); //Changeset comment
+            const changesetContainer = thisResult.querySelector('.changeset-container'); //Changeset details
+
+            const isCollapsed = changesetContainer.classList.toggle('hidden');
+
+            if (isCollapsed) {
+                //Collapsing
+                arrowSvg.classList.remove('rotated');
+                // Only after collapse transition ends, restore truncation. Else it looks very choppy.
+                setTimeout(() => changesetComment.classList.add('truncated'), 300);
+            } else {
+                // Expanding
+                arrowSvg.classList.add('rotated');
+                changesetComment.classList.remove('truncated');
+            }
+        })
         .append('svg')
         .classed('arrow-up-svg', true)
         .append('use')
@@ -1277,16 +1300,20 @@ function renderChangesetsList(changesetsToDisplay) {
 
     //Changeset container
     let changesetContainer = rl.append('div')
-        .classed('changeset-container', true)
+        .classed('changeset-container hidden', true)
         //Changeset title (was downloaded separately from OSM API)
         .html(function (d) { // d.comment might contain HTML highlights from filtering
-            return `<a href="https://openstreetmap.org/browse/changeset/${d.id}" target="_blank" class="comment" title="Go to OSM changeset page\n\n${changesets[d.id].comment}">${d.comment || '<span class="no-comment">—</span>'}</a>`;
+            return `<a href="https://openstreetmap.org/browse/changeset/${d.id}" target="_blank" class="comment truncated" title="Go to OSM changeset page\n\n${changesets[d.id].comment}">${d.comment || '<span class="no-comment">—</span>'}</a>`;
         });
 
     //All changeset details which are hidden by default
     changesetContainer.append('div')
-        .classed('changeset-details-container', true)
-        .text('The changeset details will go into divs within this container.');
+        .classed('section', true)
+        .text('Changeset Details');
+
+    changesetContainer.append('div')
+        .classed('section', true)
+        .text('More changeset Details');
 }
 
 //Highlight clicked layer on map and in sidebar (happens when selecting element in sidebar or on map)
