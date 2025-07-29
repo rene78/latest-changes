@@ -1270,6 +1270,7 @@ function renderChangesetsList(changesetsToDisplay) {
     //Arrow to expand changeset information
     rl.append('div')
         .classed('arrow', true)
+        .attr('title', 'Open details of changeset')
         .on('click', function (event, d) {
             //Element related to the arrow animation
             const arrowDiv = d3.select(this);  // 'this' refers to the clicked element
@@ -1287,10 +1288,14 @@ function renderChangesetsList(changesetsToDisplay) {
                 arrowSvg.classList.remove('rotated');
                 // Only after collapse transition ends, restore truncation. Else it looks very choppy.
                 setTimeout(() => changesetComment.classList.add('truncated'), 300);
+                // Update tooltip when hovering over arrow
+                arrowDiv.attr('title', 'Open details of changeset');
             } else {
                 // Expanding
                 arrowSvg.classList.add('rotated');
                 changesetComment.classList.remove('truncated');
+                // Update tooltip when hovering over arrow
+                arrowDiv.attr('title', 'Close details of changeset');
             }
         })
         .append('svg')
