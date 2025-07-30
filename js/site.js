@@ -447,6 +447,7 @@ function run() {
                         deltaInTags: 0,
                         discussionCount: 0, // Initialize
                         id: changesetNumber,
+                        imageryUsed: [],
                         leafletFeatureGroup: L.featureGroup(), // Logical group, not added to map
                         osmEditor: '',
                         possibleVandalism: false,
@@ -964,10 +965,31 @@ function run() {
                         }
                         changesets[cid].deltaInIdWarningsAndResolves = nIdResolvedWarnings - nIdWarnings;
 
-                        ////Get name of used OSM editor
+                        //Get name of used OSM editor
                         const osmEditorTag = css[i].querySelector('tag[k="created_by"]');
                         if (osmEditorTag)
                             changesets[cid].osmEditor = osmEditorTag.getAttribute('v');
+
+                        //Write the names of the used satellite imagery providers into changeset object
+                        const imageryUsedTag = css[i].querySelector('tag[k="imagery_used"]');
+                        const sourceTag = css[i].querySelector('tag[k="source"]');
+
+                        const imageryUsedValue = imageryUsedTag?.getAttribute('v') || "";
+                        const sourceValue = sourceTag?.getAttribute('v') || "";
+
+                        // Combine both strings with a semicolon (only if both are non-empty)
+                        const combined = [imageryUsedValue, sourceValue]
+                            .filter(s => s.trim() !== "")  // remove empty strings
+                            .join(';');
+
+                        const imageryUsedArray = combined
+                            .split(';')
+                            .map(s => s.trim())
+                            .filter(s => s); // final cleanup
+
+                        // console.log(cid + ': ' + imageryUsedArray + ' length: ' + imageryUsedArray.length);
+                        // console.log(imageryUsedArray);
+                        changesets[cid].imageryUsed = imageryUsedArray;
                     }
                 }
             });
@@ -1313,12 +1335,32 @@ function renderChangesetsList(changesetsToDisplay) {
 
     //All changeset details which are hidden by default
     changesetContainer.append('div')
-        .classed('section', true)
+        .classed('changeset-section-heading', true)
         .text('Changeset Details');
 
     changesetContainer.append('div')
-        .classed('section', true)
-        .text('More changeset Details');
+        // .classed('??', true)
+        .html(function (d) {
+            // console.log(d.id);
+            return `Editor: ${changesets[d.id].osmEditor || '-'}`;
+        })
+
+    changesetContainer.append('div')
+        // .classed('??', true)
+        .html(function (d) {
+            // console.log(d.id);
+            const imageryUsed = changesets[d.id].imageryUsed;
+            if (imageryUsed.length === 0) return 'Imagery: -';
+            else if (imageryUsed.length === 1) return `Imagery: ${imageryUsed[0]}`;
+            else {
+                let html = 'Imagery: <ul class="imagery-list">';
+                imageryUsed.forEach((provider, index) => {
+                    html += `<li>${provider}</li>`;
+                })
+                html += '</ul>';
+                return html;
+            };
+        })
 }
 
 //Highlight clicked layer on map and in sidebar (happens when selecting element in sidebar or on map)
