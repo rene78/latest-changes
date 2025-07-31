@@ -1361,6 +1361,60 @@ function renderChangesetsList(changesetsToDisplay) {
                 return html;
             };
         })
+
+    changesetContainer.append('div')
+        .classed('changeset-table', true)
+        .html(function (d) {
+            let imageryHtml;
+            const imageryUsed = changesets[d.id].imageryUsed;
+            if (imageryUsed.length === 0) imageryHtml = '-';
+            else if (imageryUsed.length === 1) imageryHtml= imageryUsed[0];
+            else {
+                imageryHtml = '<ul class="imagery-list">';
+                imageryUsed.forEach((provider, index) => {
+                    imageryHtml += `<li>${provider}</li>`;
+                })
+                imageryHtml += '</ul>';
+            }
+
+                let tableHtml = `
+                <table class="table-container">
+                    <tbody>
+                        <tr class="table-heading">
+                            <td colspan="2">Changeset Details</td>
+                        </tr>
+                        <tr>
+                            <td>Imagery</td>
+                            <td>${imageryHtml}</td>
+                        </tr>
+                        <tr>
+                            <td>Editor</td>
+                            <td>${changesets[d.id].osmEditor || '-'}</td>
+                        </tr>
+                        <tr class="table-heading">
+                            <td colspan="2">User Experience</td>
+                        </tr>
+                        <tr>
+                            <td>Number of edits</td>
+                            <td>22222</td>
+                        </tr>
+                        <tr>
+                            <td>Joined</td>
+                            <td>xx years ago</td>
+                        </tr>
+                        <tr class="table-heading">
+                            <td colspan="2">Changeset Integrity</td>
+                        <tr>
+                            <td>Elements Added-Deleted</td>
+                            <td>${changesets[d.id].deltaInNodesWays}
+                            <div class="traffic-light"><span class="${changesets[d.id].deltaInNodesWays < vandalismThreshold ? "red" : "gray"}"></span><span class="${changesets[d.id].deltaInNodesWays < vandalismThreshold ? "gray" : "green"}"></span></div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            `;
+                return tableHtml;
+            })
 }
 
 //Highlight clicked layer on map and in sidebar (happens when selecting element in sidebar or on map)
@@ -1425,7 +1479,7 @@ function highlightSearchTermInText(text, searchTerm) {
             let match;
             while ((match = regex.exec(originalText)) !== null) {
                 highlightedText += originalText.substring(lastIndex, match.index); // The original text up until the search term encounter...
-                highlightedText += `<mark>${match[0]}</mark>`; // ...plus the highlighted search term...
+                highlightedText += `< mark > ${match[0]}</mark> `; // ...plus the highlighted search term...
                 lastIndex = regex.lastIndex; // index at the end of the search term
             }
             highlightedText += originalText.substring(lastIndex); // ...plus the part of the text after the highlighted search term
