@@ -183,10 +183,11 @@ a:visited {
 
 .result {
   display: grid;
-  grid-template-columns: 0fr 0fr 0fr auto auto 40px;
-  /* | Loupe | Traffic light | Text bubble | User name | Age | Arrow */
-  grid-template-rows: auto auto;
-
+  grid-template-columns: 0fr 0fr 0fr auto 0fr;
+  grid-template-rows: auto auto auto;
+  /* | Loupe | Traffic light | Text bubble | User Name & Time | Arrow | */
+  /* | Loupe |                Changeset Comment               | Arrow | */
+  /* |                        Changeset Details                       | */
   border-bottom: 1px solid #eee;
   transition: background-color .2s ease-in-out;
   -moz-transition: background-color .2s ease-in-out;
@@ -296,7 +297,7 @@ a:visited {
 }
 
 .container-name-date {
-  grid-column: 4 / span 2;
+  grid-column: 4;
   grid-row: 1;
   display: flex;
   align-items: center;
@@ -326,7 +327,7 @@ user name is truncated if it takes up too much space*/
 }
 
 .result .arrow {
-  grid-column: 6;
+  grid-column: 5;
   grid-row: 1 / span 2;
   justify-content: center;
   display: flex;
@@ -364,12 +365,13 @@ user name is truncated if it takes up too much space*/
   /* Turn arrow counterclockwise when expanding */
 }
 
+/*
 .changeset-container {
   grid-column: 2 / span 4;
   grid-row: 2;
   overflow: hidden;
   height: calc-size(max-content, size);
-  /* calc-size is only a draft as of 2025-07. Limited browser compatibility */
+  calc-size is only a draft as of 2025-07. Limited browser compatibility
   transition: height 0.3s ease;
 }
 
@@ -378,7 +380,6 @@ user name is truncated if it takes up too much space*/
   text-overflow: ellipsis;
   height: 30px;
 }
-
 .changeset-container .comment {
   text-decoration: none;
   overflow: hidden;
@@ -393,13 +394,71 @@ user name is truncated if it takes up too much space*/
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+*/
 
-.changeset-section-heading {
+.changeset-comment {
+  grid-column: 2 / span 3;
+  grid-row: 2;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-decoration: none;
   font-weight: bold;
+  font-size: 18px;
+}
+
+.changeset-comment.expanded {
+  text-align: center;
+}
+
+.table-container {
+  grid-column: 1 / span 5;
+  grid-row: 3;
+  height: calc-size(max-content, size);
+  /* calc-size is only in draft status as of 2025-08. Thus limited browser compatibility. */
+  transition: height 0.3s ease;
+  overflow: hidden;
+  color: #333;
+}
+
+.table-container.hidden {
+  height: 0;
+}
+
+.changeset-table {
+  border-collapse: collapse;
+  margin: 0 auto;
+  background-color: white;
+}
+
+/* Color the right border of the first column in black. Increase the font weight of all the text in this column. */
+.changeset-table tr:not(.table-heading) td:nth-child(1) {
+  border-right: 1px solid black;
+  font-weight: 600;
+}
+
+.changeset-table td {
+  padding: 0 3px;
+}
+
+.changeset-table .border-bottom {
+  border-bottom: 1px solid black;
+}
+
+.table-heading {
+  background-color: #e5e5e5;
+  text-align: center;
+  font-weight: 600;
+  font-size: 16px;
 }
 
 .imagery-list {
-  padding-left: 25px;
+  padding-left: 0px;
+  list-style-position: inside;
+}
+
+.integrity {
+  white-space: nowrap;
 }
 
 /* Custom scroll bar
@@ -637,33 +696,34 @@ user name is truncated if it takes up too much space*/
   opacity: 0.9
 }
 
-
-table {
+.tag-table-container {
   border-collapse: collapse;
   margin: 5px 0;
   border-top: 1px solid #c9c8c8;
 }
 
-tr {
+.tag-table-container tr {
   border-bottom: 1px solid black;
 }
 
-td {
+.tag-table-container td {
   padding: 0 3px;
 }
 
-td:nth-child(1) {
+/* Color the right border of the first column in black. Increase the font weight of all the text in this column. */
+.tag-table-container td:nth-child(1) {
   border-right: 1px solid black;
   font-weight: 600;
 }
 
-td:nth-child(2) {
+/* Color the right border of the second column in a brighter shade of gray */
+.tag-table-container td:nth-child(2) {
   border-right: 1px solid rgb(170, 170, 170);
 }
 
 /* Truncate text in table on small screens */
 @media (max-width: 600px) {
-  td {
+  .tag-table-container td {
     max-width: 100px;
     overflow: hidden;
     text-overflow: ellipsis;

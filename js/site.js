@@ -740,7 +740,7 @@ function run() {
                         <a href="http://osmlab.github.io/osm-deep-history/#/${node[0].nodeName}/${node[0].getAttribute("id")}" title="Get complete history of element in 'OSM Deep History'" target="_blank" rel="noopener noreferrer">
                             <svg class="clock-with-circular-arrow-symbol"><use href="img/icons.svg#clock-with-circular-arrow"></use></svg>
                         </a>
-                        <table class="table-container">
+                        <table class="tag-table-container">
                     `;
 
                     //Object with all key-value pairs for new and old feature and relevant meta tags for table
@@ -1300,22 +1300,26 @@ function renderChangesetsList(changesetsToDisplay) {
 
             //Elements related to the expansion of the changeset details
             const thisResult = this.closest('.result'); // find parent element
-            const changesetComment = thisResult.querySelector('.comment'); //Changeset comment
-            const changesetContainer = thisResult.querySelector('.changeset-container'); //Changeset details
+            const changesetComment = thisResult.querySelector('.changeset-comment'); //Changeset comment
+            const tableContainer = thisResult.querySelector('.table-container'); //Changeset details
 
-            const isCollapsed = changesetContainer.classList.toggle('hidden');
+            const isCollapsed = tableContainer.classList.toggle('hidden');
 
             if (isCollapsed) {
                 //Collapsing
                 arrowSvg.classList.remove('rotated');
                 // Only after collapse transition ends, restore truncation. Else it looks very choppy.
-                setTimeout(() => changesetComment.classList.add('truncated'), 300);
+                setTimeout(() => {
+                    changesetComment.classList.remove('expanded');
+changesetComment.innerText = d.comment;
+                }, 300);
                 // Update tooltip when hovering over arrow
                 arrowDiv.attr('title', 'Open details of changeset');
             } else {
                 // Expanding
                 arrowSvg.classList.add('rotated');
-                changesetComment.classList.remove('truncated');
+                changesetComment.classList.add('expanded');
+                changesetComment.innerText = "Details";
                 // Update tooltip when hovering over arrow
                 arrowDiv.attr('title', 'Close details of changeset');
             }
@@ -1325,50 +1329,29 @@ function renderChangesetsList(changesetsToDisplay) {
         .append('use')
         .attr('href', 'img/icons.svg#arrow-up');
 
-    //Changeset container
-    let changesetContainer = rl.append('div')
-        .classed('changeset-container hidden', true)
-        //Changeset title (was downloaded separately from OSM API)
-        .html(function (d) { // d.comment might contain HTML highlights from filtering
-            return `<a href="https://openstreetmap.org/browse/changeset/${d.id}" target="_blank" class="comment truncated" title="Go to OSM changeset page">${d.comment || '<span class="no-comment">—</span>'}</a>`;
-        });
+    //Changeset comment
+rl.append('a')
+.classed('changeset-comment', true)
+.attr('href', 'https://openstreetmap.org/browse/changeset/${d.id}')
+.attr('target', '_blank')
+.attr('title', 'Go to OSM changeset page')
+//Changeset title (was downloaded separately from OSM API)
+.html((d)=> {// d.comment might contain HTML highlights from filtering
+    return d.comment || '<span class="no-comment">—</span>';
+})
+
+//Changeset details. Appears after clicking on the arrow button
+    let tableContainer = rl.append('div')
+        .classed('table-container hidden', true)
 
     //All changeset details which are hidden by default
-    changesetContainer.append('div')
-        .classed('changeset-section-heading', true)
-        .text('Changeset Details');
-
-    changesetContainer.append('div')
-        // .classed('??', true)
-        .html(function (d) {
-            // console.log(d.id);
-            return `Editor: ${changesets[d.id].osmEditor || '-'}`;
-        })
-
-    changesetContainer.append('div')
-        // .classed('??', true)
-        .html(function (d) {
-            // console.log(d.id);
-            const imageryUsed = changesets[d.id].imageryUsed;
-            if (imageryUsed.length === 0) return 'Imagery: -';
-            else if (imageryUsed.length === 1) return `Imagery: ${imageryUsed[0]}`;
-            else {
-                let html = 'Imagery: <ul class="imagery-list">';
-                imageryUsed.forEach((provider, index) => {
-                    html += `<li>${provider}</li>`;
-                })
-                html += '</ul>';
-                return html;
-            };
-        })
-
-    changesetContainer.append('div')
+    tableContainer.append('table')
         .classed('changeset-table', true)
         .html(function (d) {
             let imageryHtml;
             const imageryUsed = changesets[d.id].imageryUsed;
             if (imageryUsed.length === 0) imageryHtml = '-';
-            else if (imageryUsed.length === 1) imageryHtml= imageryUsed[0];
+            else if (imageryUsed.length === 1) imageryHtml = imageryUsed[0];
             else {
                 imageryHtml = '<ul class="imagery-list">';
                 imageryUsed.forEach((provider, index) => {
@@ -1377,13 +1360,23 @@ function renderChangesetsList(changesetsToDisplay) {
                 imageryHtml += '</ul>';
             }
 
-                let tableHtml = `
-                <table class="table-container">
+            const usedEditorWasId = changesets[d.id].osmEditor && changesets[d.id].osmEditor.toLowerCase().startsWith("id");//code is written twice. not very clean.
+            htmlForIdWarningsCheck = `
+                <tr class="integrity ${changesets[d.id].deltaInIdWarningsAndResolves < vandalismThreshold ? "delete" : "create"}">
+                    <td>iD Warnings<br>Resolved-New</td>
+                    <td>${changesets[d.id].deltaInIdWarningsAndResolves}</td>
+                </tr>`;
+
+            let tableHtml = `
                     <tbody>
                         <tr class="table-heading">
                             <td colspan="2">Changeset Details</td>
                         </tr>
-                        <tr>
+                        <tr class="border-bottom">
+                            <td>Comment</td>
+                            <td>${changesets[d.id].comment}</td>
+                        </tr>
+                        <tr class="border-bottom">
                             <td>Imagery</td>
                             <td>${imageryHtml}</td>
                         </tr>
@@ -1394,28 +1387,35 @@ function renderChangesetsList(changesetsToDisplay) {
                         <tr class="table-heading">
                             <td colspan="2">User Experience</td>
                         </tr>
-                        <tr>
-                            <td>Number of edits</td>
-                            <td>22222</td>
+                        <tr class="border-bottom">
+                            <td>Edits count</td>
+                            <td>22222 (dummy)</td>
                         </tr>
                         <tr>
                             <td>Joined</td>
-                            <td>xx years ago</td>
+                            <td>xx years ago (dummy)</td>
                         </tr>
                         <tr class="table-heading">
                             <td colspan="2">Changeset Integrity</td>
-                        <tr>
-                            <td>Elements Added-Deleted</td>
-                            <td>${changesets[d.id].deltaInNodesWays}
-                            <div class="traffic-light"><span class="${changesets[d.id].deltaInNodesWays < vandalismThreshold ? "red" : "gray"}"></span><span class="${changesets[d.id].deltaInNodesWays < vandalismThreshold ? "gray" : "green"}"></span></div>
-                            </td>
                         </tr>
-                    </tbody>
-                </table>
-            `;
-                return tableHtml;
-            })
+                        <tr class="integrity border-bottom ${changesets[d.id].deltaInNodesWays < vandalismThreshold ? "delete" : "create"}">
+                            <td>Elements<br>Added-Deleted</td>
+                            <td>${changesets[d.id].deltaInNodesWays}</td>
+                        </tr>
+                        <tr class="integrity border-bottom ${changesets[d.id].deltaInTags < vandalismThreshold ? "delete" : "create"}">
+                            <td>Tags<br>Added-Deleted</td>
+                            <td>${changesets[d.id].deltaInTags}</td>
+                        </tr>
+                        ${usedEditorWasId ? htmlForIdWarningsCheck : ""}
+                    </tbody>`;
+            return tableHtml;
+        })
 }
+
+/*
+in case you want the traffic light in the table above:
+<div class="traffic-light"><span class="${changesets[d.id].deltaInNodesWays < vandalismThreshold ? "red" : "gray"}"></span><span class="${changesets[d.id].deltaInNodesWays < vandalismThreshold ? "gray" : "green"}"></span></div>
+*/
 
 //Highlight clicked layer on map and in sidebar (happens when selecting element in sidebar or on map)
 // eventOrFeature can be a Leaflet GeoJSON feature (from map click) or null (from sidebar click/hover)
@@ -1479,7 +1479,7 @@ function highlightSearchTermInText(text, searchTerm) {
             let match;
             while ((match = regex.exec(originalText)) !== null) {
                 highlightedText += originalText.substring(lastIndex, match.index); // The original text up until the search term encounter...
-                highlightedText += `< mark > ${match[0]}</mark> `; // ...plus the highlighted search term...
+                highlightedText += `< mark > ${match[0]}</mark > `; // ...plus the highlighted search term...
                 lastIndex = regex.lastIndex; // index at the end of the search term
             }
             highlightedText += originalText.substring(lastIndex); // ...plus the part of the text after the highlighted search term
