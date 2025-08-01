@@ -1311,7 +1311,7 @@ function renderChangesetsList(changesetsToDisplay) {
                 // Only after collapse transition ends, restore truncation. Else it looks very choppy.
                 setTimeout(() => {
                     changesetComment.classList.remove('expanded');
-changesetComment.innerText = d.comment;
+                    changesetComment.innerText = d.comment;
                 }, 300);
                 // Update tooltip when hovering over arrow
                 arrowDiv.attr('title', 'Open details of changeset');
@@ -1330,17 +1330,17 @@ changesetComment.innerText = d.comment;
         .attr('href', 'img/icons.svg#arrow-up');
 
     //Changeset comment
-rl.append('a')
-.classed('changeset-comment', true)
-.attr('href', 'https://openstreetmap.org/browse/changeset/${d.id}')
-.attr('target', '_blank')
-.attr('title', 'Go to OSM changeset page')
-//Changeset title (was downloaded separately from OSM API)
-.html((d)=> {// d.comment might contain HTML highlights from filtering
-    return d.comment || '<span class="no-comment">—</span>';
-})
+    rl.append('a')
+        .classed('changeset-comment', true)
+        .attr('href', 'https://openstreetmap.org/browse/changeset/${d.id}')
+        .attr('target', '_blank')
+        .attr('title', 'Go to OSM changeset page')
+        //Changeset title (was downloaded separately from OSM API)
+        .html((d) => {// d.comment might contain HTML highlights from filtering
+            return d.comment || '<span class="no-comment">—</span>';
+        })
 
-//Changeset details. Appears after clicking on the arrow button
+    //Changeset details. Appears after clicking on the arrow button
     let tableContainer = rl.append('div')
         .classed('table-container hidden', true)
 

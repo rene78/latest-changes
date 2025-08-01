@@ -429,6 +429,7 @@ user name is truncated if it takes up too much space*/
   border-collapse: collapse;
   margin: 0 auto;
   background-color: white;
+  width: 100%;
 }
 
 /* Color the right border of the first column in black. Increase the font weight of all the text in this column. */
