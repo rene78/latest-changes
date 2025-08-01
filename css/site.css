@@ -338,7 +338,6 @@ user name is truncated if it takes up too much space*/
   border-radius: 50%;
   margin-top: 5px;
   background-color: #e5e5e5;
-  stroke: #777;
   box-shadow: 0 2px 4px darkslategrey;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -358,43 +357,13 @@ user name is truncated if it takes up too much space*/
   height: 24px;
   transition: transform 0.3s ease;
   transform: rotate(0deg);
+  fill: #777777;
 }
 
 .arrow-up-svg.rotated {
   transform: rotate(180deg);
   /* Turn arrow counterclockwise when expanding */
 }
-
-/*
-.changeset-container {
-  grid-column: 2 / span 4;
-  grid-row: 2;
-  overflow: hidden;
-  height: calc-size(max-content, size);
-  calc-size is only a draft as of 2025-07. Limited browser compatibility
-  transition: height 0.3s ease;
-}
-
-.changeset-container.hidden {
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  height: 30px;
-}
-.changeset-container .comment {
-  text-decoration: none;
-  overflow: hidden;
-  display: block;
-  white-space: normal;
-  font-weight: bold;
-  font-size: 18px;
-  border-bottom: 1px solid #a1a1a1;
-}
-
-.changeset-container .comment.truncated {
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-*/
 
 .changeset-comment {
   grid-column: 2 / span 3;

@@ -1314,14 +1314,14 @@ function renderChangesetsList(changesetsToDisplay) {
                     changesetComment.innerText = d.comment;
                 }, 300);
                 // Update tooltip when hovering over arrow
-                arrowDiv.attr('title', 'Open details of changeset');
+                arrowDiv.attr('title', 'Open changeset information');
             } else {
                 // Expanding
                 arrowSvg.classList.add('rotated');
                 changesetComment.classList.add('expanded');
-                changesetComment.innerText = "Details";
+                changesetComment.innerText = "Information";
                 // Update tooltip when hovering over arrow
-                arrowDiv.attr('title', 'Close details of changeset');
+                arrowDiv.attr('title', 'Close changeset information');
             }
         })
         .append('svg')
