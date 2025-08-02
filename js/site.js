@@ -452,7 +452,8 @@ function run() {
                         osmEditor: '',
                         possibleVandalism: false,
                         time: new Date(layer.feature.properties.meta.timestamp),
-                        user: layer.feature.properties.meta.user
+                        user: layer.feature.properties.meta.user,
+                        userId:layer.feature.properties.meta.uid
                     };
                 }
                 //Add the layer to their respective changeset feature groups in changesets
@@ -1265,7 +1266,6 @@ function renderChangesetsList(changesetsToDisplay) {
     containerNameDate.append('a')
         .classed('user-name', true)
         .html(function (d) {
-            // console.log(d.user);
             return d.user; // d.user might contain HTML highlights from filtering
         })
         .attr('title', function (d) {
@@ -1374,7 +1374,7 @@ function renderChangesetsList(changesetsToDisplay) {
                         </tr>
                         <tr class="border-bottom">
                             <td>Comment</td>
-                            <td>${changesets[d.id].comment}</td>
+                            <td>${d.comment}</td>
                         </tr>
                         <tr class="border-bottom">
                             <td>Imagery</td>
@@ -1388,12 +1388,12 @@ function renderChangesetsList(changesetsToDisplay) {
                             <td colspan="2">User Experience</td>
                         </tr>
                         <tr class="border-bottom">
-                            <td>Edits count</td>
+                            <td class="user-changesets-count">Edits count</td>
                             <td>22222 (dummy)</td>
                         </tr>
                         <tr>
                             <td>Joined</td>
-                            <td>xx years ago (dummy)</td>
+                            <td class="user-time-since-signup">xx years ago (dummy)</td>
                         </tr>
                         <tr class="table-heading">
                             <td colspan="2">Changeset Integrity</td>
@@ -1479,7 +1479,7 @@ function highlightSearchTermInText(text, searchTerm) {
             let match;
             while ((match = regex.exec(originalText)) !== null) {
                 highlightedText += originalText.substring(lastIndex, match.index); // The original text up until the search term encounter...
-                highlightedText += `< mark > ${match[0]}</mark > `; // ...plus the highlighted search term...
+                highlightedText += `<mark>${match[0]}</mark> `; // ...plus the highlighted search term...
                 lastIndex = regex.lastIndex; // index at the end of the search term
             }
             highlightedText += originalText.substring(lastIndex); // ...plus the part of the text after the highlighted search term
