@@ -453,7 +453,7 @@ function run() {
                         possibleVandalism: false,
                         time: new Date(layer.feature.properties.meta.timestamp),
                         user: layer.feature.properties.meta.user,
-                        userId:layer.feature.properties.meta.uid
+                        userId: layer.feature.properties.meta.uid
                     };
                 }
                 //Add the layer to their respective changeset feature groups in changesets
@@ -1086,6 +1086,7 @@ function run() {
             // console.log(changesets);
             vandalismChecker();//Analyse each changeset and create boolean "possibleVandalism" within "changesets" object
             renderChangesetsList(changesets);//Render changesets list on the left side
+            fetchAndDisplayUserDetails(changesets);//After the whole data is loaded and rendered download some 'nice-to-have' user data (total edits & sign-up date) and add it to the changeset information
         })
         .catch(function (error) { // ERROR handler for ANY error in the Promise chain above
             if (error.name === 'AbortError') {
@@ -1113,6 +1114,68 @@ function run() {
                 window.currentAbortController = null;
                 // console.log("AbortController reference cleared.");
             }
+        });
+}
+
+// Fetch extended user details (total edits & sign-up date) and update the UI.
+function fetchAndDisplayUserDetails(changesetsToDisplay) {
+    // 1. Collect all unique user IDs from the visible changesets
+    const userIds = new Set();
+    for (const id in changesetsToDisplay) {
+        if (changesetsToDisplay[id] && changesetsToDisplay[id].userId) {
+            userIds.add(changesetsToDisplay[id].userId);
+        }
+    }
+
+    if (userIds.size === 0) return; // No users to fetch
+
+    // 2. Form the URL for the OSM User API
+    const userIdsArray = Array.from(userIds);
+    const url = debugMode
+        ? "./examples/exampleUsers.json" // Use a local file for debugging
+        : `https://api.openstreetmap.org/api/0.6/users.json?users=${userIdsArray.join(',')}`;
+
+    // 3. Fetch the data. This is a "nice-to-have" call, so we handle errors gracefully.
+    fetch(url)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error fetching user data! Status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            // 4. Write the response into our 'changesets' object
+            // console.log(data);
+            changesets.userData = {};
+            if (data && data.users) {
+                data.users.forEach(user => {
+                    // console.log(user.user.id);
+                    changesets.userData[user.user.id] = { accountCreated: user.user.account_created, changesetCount: user.user.changesets.count };
+                });
+            }
+
+            // 5. Update the DOM with the fetched data
+            // Select all result list items that have a 'osm-user-id' attribute
+            d3.selectAll('.result[data-osm-user-id]').each(function () {
+                const li = d3.select(this);
+                const userId = li.attr('data-osm-user-id');
+                // console.log(userId);
+                const userData = changesets.userData[userId];
+                // console.log(userData);
+
+                if (userData) {
+                    // Unhide the "User Experience" section
+                    li.selectAll('.user-experience-heading, .user-experience-row').classed('hide', false);
+
+                    // Update the table cells with the new data
+                    li.select('.user-changesets-count').text(userData.changesetCount.toLocaleString());
+                    li.select('.user-time-since-signup').text(moment(userData.accountCreated).fromNow());
+                }
+            });
+        })
+        .catch(error => {
+            // If the API call fails, we just log it and do nothing. The UI will simply not show the extra info.
+            console.warn("Could not fetch extended user details:", error.message);
         });
 }
 
@@ -1179,6 +1242,7 @@ function renderChangesetsList(changesetsToDisplay) {
     const rl = allresults.enter()
         .append('li')
         .attr('class', 'result')
+        .attr('data-osm-user-id', d => d.userId)
         .attr('title', 'Changeset is highlighted on map')
         .style('color', d => changesets[d.id].color)
         .on('click', (event, d) => click(null, d))//Highlight changeset on click (desktop/mobile) - Pass null for feature, d for data
@@ -1344,7 +1408,7 @@ function renderChangesetsList(changesetsToDisplay) {
     let tableContainer = rl.append('div')
         .classed('table-container hidden', true)
 
-    //All changeset details which are hidden by default
+    //The changeset details table which is hidden by default
     tableContainer.append('table')
         .classed('changeset-table', true)
         .html(function (d) {
@@ -1367,6 +1431,9 @@ function renderChangesetsList(changesetsToDisplay) {
                     <td>${changesets[d.id].deltaInIdWarningsAndResolves}</td>
                 </tr>`;
 
+                // Infos regarding the "User Experience" data: After executing run() the user data (i.e. total edits & sign-up date) has not been
+                // downloaded and written into the 'changesets' object yet. When using the filter function the data is already in 'changesets'.
+                // That is why we check if 'changesets.userData?.[d.userId]' is available or not.
             let tableHtml = `
                     <tbody>
                         <tr class="table-heading">
@@ -1384,16 +1451,16 @@ function renderChangesetsList(changesetsToDisplay) {
                             <td>Editor</td>
                             <td>${changesets[d.id].osmEditor || '-'}</td>
                         </tr>
-                        <tr class="table-heading">
+                        <tr class="table-heading user-experience-heading ${!(changesets.userData?.[d.userId]) ? "hide" : ""}">
                             <td colspan="2">User Experience</td>
                         </tr>
-                        <tr class="border-bottom">
-                            <td class="user-changesets-count">Edits count</td>
-                            <td>22222 (dummy)</td>
+                        <tr class="border-bottom user-experience-row ${!(changesets.userData?.[d.userId]) ? "hide" : ""}">
+                            <td>Edits count</td>
+                            <td class="user-changesets-count">${!(changesets.userData?.[d.userId]) ? "..." : changesets.userData[d.userId].changesetCount.toLocaleString()}</td>
                         </tr>
-                        <tr>
+                        <tr class="user-experience-row ${!(changesets.userData?.[d.userId]) ? "hide" : ""}">
                             <td>Joined</td>
-                            <td class="user-time-since-signup">xx years ago (dummy)</td>
+                            <td class="user-time-since-signup">${!(changesets.userData?.[d.userId]) ? "..." : moment(changesets.userData[d.userId].accountCreated).fromNow()}</td>
                         </tr>
                         <tr class="table-heading">
                             <td colspan="2">Changeset Integrity</td>
