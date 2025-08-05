@@ -283,7 +283,7 @@ function toggleWaitingScreen() {
 //On page load: Check if map is zoomed in enough. If yes: Download OSM changeset data from overpass
 const overpass_server = '//overpass-api.de/api/'; //'https://overpass.kumi.systems/api/';
 const vandalismThreshold = -3; //If 3 more elements or tags have been deleted than added, the traffic light will change to red
-const debugMode = true; //False (default): Do an API call to Overpass. True: Use locally saved xml files for debugging/development purposes
+const debugMode = false; //False (default): Do an API call to Overpass. True: Use locally saved xml files for debugging/development purposes
 
 // Reset AbortController to null during load of script. Needed to reset all Promise requests.
 window.currentAbortController = null;
@@ -1243,7 +1243,7 @@ function renderChangesetsList(changesetsToDisplay) {
         .append('li')
         .attr('class', 'result')
         .attr('data-osm-user-id', d => d.userId)
-        .attr('title', 'Changeset is highlighted on map')
+        // .attr('title', 'Changeset is highlighted on map')
         .style('color', d => changesets[d.id].color)
         .on('click', (event, d) => click(null, d))//Highlight changeset on click (desktop/mobile) - Pass null for feature, d for data
         .on('mouseover', (event, d) => click(null, d));//Highlight changeset on mouseover (desktop) - Pass null for feature, d for data
@@ -1441,7 +1441,7 @@ function renderChangesetsList(changesetsToDisplay) {
                         </tr>
                         <tr class="border-bottom">
                             <td>Comment</td>
-                            <td>${d.comment}</td>
+                            <td class="table-changeset-comment">${d.comment}</td>
                         </tr>
                         <tr class="border-bottom">
                             <td>Imagery</td>
@@ -1449,7 +1449,7 @@ function renderChangesetsList(changesetsToDisplay) {
                         </tr>
                         <tr>
                             <td>Editor</td>
-                            <td>${changesets[d.id].osmEditor || '-'}</td>
+                            <td class="editor">${changesets[d.id].osmEditor || '-'}</td>
                         </tr>
                         <tr class="table-heading user-experience-heading ${!(changesets.userData?.[d.userId]) ? "hide" : ""}">
                             <td colspan="2">User Experience</td>

@@ -422,9 +422,23 @@ user name is truncated if it takes up too much space*/
   font-size: 16px;
 }
 
+/* Sometimes the content of 'comment' can be quite long and without whitespaces
+(e.g. the url of a website). Without the CSS declaration
+below the long text would expand the table width. */
+.table-changeset-comment {
+    overflow-wrap: anywhere;
+}
+
 .imagery-list {
   padding-left: 0px;
   list-style-position: inside;
+}
+
+/* Sometimes the content of 'editor' can be quite long and without whitespaces
+(e.g. 'reverter_plugin/36447;JOSM/1.5 (19431 de)'). Without the CSS declaration
+below the long text would expand the table width. */
+.editor {
+  overflow-wrap: anywhere;
 }
 
 .integrity {
@@ -465,8 +479,8 @@ user name is truncated if it takes up too much space*/
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  left: 250px;
-  bottom: 14px;
+  left: 210px;
+  bottom: 12px;
   transition: background 0.5s;
 }
 
@@ -479,8 +493,8 @@ user name is truncated if it takes up too much space*/
 @media (max-width: 600px) {
   .to-top {
     left: auto;
-    bottom: calc(50% + 15px);
-    right: 25px;
+    bottom: calc(50% + 7px);
+    right: 65px;
   }
 }
 
