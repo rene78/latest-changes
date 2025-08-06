@@ -299,6 +299,8 @@ if (isMapZoomedInEnough) run();
 function run() {
     d3.select('#map').classed('faded', true);//Map displayed greyish (Cannot go into "toggleWaitingScreen()" because we want to keep the map greyed out in case of unsuccessful overpass query)
     document.querySelector(".filter-container").classList.add("hide");//Hide filter changesets toolbar until load of changesets has been completed successfully
+    document.querySelector("#results").innerHTML = "";//Empty old results list (same happens in renderChangeSetsList() later on when filtering)
+
     toggleWaitingScreen();//Show loading animation and make download button unavailable
 
     // 1. Abort previous request if it exists
@@ -895,8 +897,6 @@ function run() {
             }
             // console.log(changesetIds);
 
-            document.querySelector("#results").innerHTML = "";//Empty old results list (same happens in renderChangeSetsList() "allresults" later on, but because of the API call below the old list in a subsequent call would still be shown for a second while the new GeoJSON data has already been loaded --> confusing UX)
-
             const promises = []; // Array to hold promises for changeset details
             const fetchChangesetBatch = (ids) => {
                 const url = debugMode
@@ -1431,9 +1431,9 @@ function renderChangesetsList(changesetsToDisplay) {
                     <td>${changesets[d.id].deltaInIdWarningsAndResolves}</td>
                 </tr>`;
 
-                // Infos regarding the "User Experience" data: After executing run() the user data (i.e. total edits & sign-up date) has not been
-                // downloaded and written into the 'changesets' object yet. When using the filter function the data is already in 'changesets'.
-                // That is why we check if 'changesets.userData?.[d.userId]' is available or not.
+            // Infos regarding the "User Experience" data: After executing run() the user data (i.e. total edits & sign-up date) has not been
+            // downloaded and written into the 'changesets' object yet. When using the filter function the data is already in 'changesets'.
+            // That is why we check if 'changesets.userData?.[d.userId]' is available or not.
             let tableHtml = `
                     <tbody>
                         <tr class="table-heading">
