@@ -335,6 +335,8 @@ function run() {
     else xmlDataLocation = overpass_server + 'interpreter?data=' + overpass_query; //API call to overpass
 
     let allOverpassXMLDataElements;
+
+    // --- First API call: Fetch GeoJSON data with OSM tags from Overpass ---
     fetch(xmlDataLocation, { signal: signal })//start fetch, return Promise. Pass signal for abort controlling.
         .then(response => {
             if (!response.ok) { // Check if the HTTP request was successful
@@ -888,9 +890,11 @@ function run() {
                 }
             }
 
-            //--- Start of the second async operation: ---
-            //Download changeset text and changeset comment count. Once done render changesets list on the left side
-            //Write changeset id's in an array. This is used to create URL for API call
+            // --- Start of the second async API call ---
+            // Download changeset text and changeset comment count from OSM API.
+            // Once done render changesets list on the left side
+
+            //Write changeset id's in an array. This is used to create URL for API call.
             const changesetIds = [];
             for (const key in changesets) {
                 changesetIds.push(key);
@@ -1117,7 +1121,7 @@ function run() {
         });
 }
 
-// Fetch extended user details (total edits & sign-up date) and update the UI.
+// --- Third API call: Fetch extended user details (total edits & sign-up date) from the OSM API and update the UI ---
 function fetchAndDisplayUserDetails(changesetsToDisplay) {
     // 1. Collect all unique user IDs from the visible changesets
     const userIds = new Set();
