@@ -1383,11 +1383,15 @@ function renderChangesetsList(changesetsToDisplay) {
                 }, 300);
                 // Update tooltip when hovering over arrow
                 arrowDiv.attr('title', 'Open changeset information');
+                // Add back the changeset comment once the details are collapsed
+                changesetComment.title = `Go to OSM changeset page\n\n${changesets[d.id].comment}`;
             } else {
                 // Expanding
                 arrowSvg.classList.add('rotated');
                 changesetComment.classList.add('expanded');
                 changesetComment.innerText = "Information";
+                //Remove the changeset comment from the tooltip when details are expanded.
+                changesetComment.title = "Go to OSM Changeset page";
                 // Update tooltip when hovering over arrow
                 arrowDiv.attr('title', 'Close changeset information');
             }
@@ -1402,7 +1406,7 @@ function renderChangesetsList(changesetsToDisplay) {
         .classed('changeset-comment', true)
         .attr('href', d => `https://openstreetmap.org/browse/changeset/${d.id}`)
         .attr('target', '_blank')
-        .attr('title', 'Go to OSM changeset page')
+        .attr('title', d => `Go to OSM changeset page\n\n${changesets[d.id].comment}`)
         //Changeset title (was downloaded separately from OSM API)
         .html((d) => {// d.comment might contain HTML highlights from filtering
             return d.comment || '<span class="no-comment">—</span>';
