@@ -400,6 +400,8 @@ function run() {
 
             const newGeojson = osmtogeojson.toGeojson(newData);
             const oldGeojson = osmtogeojson.toGeojson(oldData);
+
+            // Add a property to old features to identify them later for styling purposes
             oldGeojson.features.forEach(function (feature) {
                 feature.properties.__is_old__ = true;
             });
@@ -407,6 +409,18 @@ function run() {
             //Combine old and new GeoJSON into one
             let allGeojsonFeatures = [].concat(oldGeojson.features).concat(newGeojson.features);
             // console.log(allGeojsonFeatures);
+
+            // In rare edge cases the reference to an old node in a way might be missing in the overpass data which leads to osmtogeojson returning Null coordinates.
+            // The creation of the Leaflet layer will fail when Null coordinates are present ('Error: Invalid LatLng object: (NaN, NaN)'). Thus we filter them out here.
+            // Filter out features that contain null coordinates
+            allGeojsonFeatures = allGeojsonFeatures.filter(feature => {
+                // Check for null values within the coordinates array, handling nested arrays for Polygons/MultiLineStrings
+                const nullCoordsFound = JSON.stringify(feature.geometry.coordinates).includes('null')
+                if (nullCoordsFound) console.log("Feature with null coordinates found. This feature will not be displayed in the results:", feature);
+                // Filter the feature if null coordinates have been found, i.e. 'nullcoordsFound' is true
+                // (The .filter() method filters an item out if the expression evaluates to false. Thus we return the inverse of 'nullCoordsFound')
+                return !nullCoordsFound;
+            });
 
             //Sort allGeojsonFeatures before writing it into the changesets object
             allGeojsonFeatures.sort(sortGeoJsonFeatures); // Sort features before creating the Leaflet GeoJSON layer
