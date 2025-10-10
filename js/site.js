@@ -282,7 +282,7 @@ function toggleWaitingScreen() {
 
 //On page load: Check if map is zoomed in enough. If yes: Download OSM changeset data from overpass
 //There are multiple public Overpass instances available. See https://wiki.openstreetmap.org/wiki/Overpass_API#Public_Overpass_API_instances
-const overpassServer = '//overpass.private.coffee/api/';//'//overpass-api.de/api/';
+const overpassServer = '//overpass-api.de/api/';
 const vandalismThreshold = -3; //If 3 more elements or tags have been deleted than added, the traffic light will change to red
 const debugMode = false; //False (default): Do an API call to Overpass. True: Use locally saved xml files for debugging/development purposes
 
