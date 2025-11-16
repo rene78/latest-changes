@@ -178,11 +178,12 @@ a:visited {
 #results {
   list-style-type: none;
   margin: 0;
-  padding: 5px;
+  padding: 0;
 }
 
 .result {
   display: grid;
+  padding: 2px 6px;
   grid-template-columns: 0fr 0fr 0fr auto 0fr;
   grid-template-rows: auto auto auto;
   /* | Loupe | Traffic light | Text bubble | User Name & Time | Arrow | */
@@ -432,6 +433,7 @@ below the long text would expand the table width. */
 .imagery-list {
   padding-left: 0px;
   list-style-position: inside;
+  overflow-wrap: anywhere;/* To avoid overflow issues with long text without whitespaces, e.g. URL's */
 }
 
 /* Sometimes the content of 'editor' can be quite long and without whitespaces
@@ -703,6 +705,12 @@ below the long text would expand the table width. */
 /* Color the right border of the second column in a brighter shade of gray */
 .tag-table-container td:nth-child(2) {
   border-right: 1px solid rgb(170, 170, 170);
+}
+
+/* Wrap long text in the 'Old' and 'New' column if there is not enough space */
+.tag-table-container td:nth-child(2),
+.tag-table-container td:nth-child(3) {
+    overflow-wrap: anywhere;
 }
 
 /* Truncate text in table on small screens */
