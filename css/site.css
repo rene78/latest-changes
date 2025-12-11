@@ -402,8 +402,9 @@ user name is truncated if it takes up too much space*/
   width: 100%;
 }
 
-/* Color the right border of the first column in black. Increase the font weight of all the text in this column. */
-.changeset-table tr:not(.table-heading) td:nth-child(1) {
+/* Color the right border of the first column in black. Increase the font weight of all the text in this column.
+Exclude all table headings and the changeset discussion section from this rule*/
+.changeset-table tr:not(.table-heading):not(:has(td.changeset-discussion)) td:nth-child(1) {
   border-right: 1px solid black;
   font-weight: 600;
 }
@@ -427,13 +428,14 @@ user name is truncated if it takes up too much space*/
 (e.g. the url of a website). Without the CSS declaration
 below the long text would expand the table width. */
 .table-changeset-comment {
-    overflow-wrap: anywhere;
+  overflow-wrap: anywhere;
 }
 
 .imagery-list {
   padding-left: 0px;
   list-style-position: inside;
-  overflow-wrap: anywhere;/* To avoid overflow issues with long text without whitespaces, e.g. URL's */
+  overflow-wrap: anywhere;
+  /* To avoid overflow issues with long text without whitespaces, e.g. URL's */
 }
 
 /* Sometimes the content of 'editor' can be quite long and without whitespaces
@@ -445,6 +447,23 @@ below the long text would expand the table width. */
 
 .integrity {
   white-space: nowrap;
+}
+
+.changeset-discussion {
+  font-weight: initial;
+}
+
+.comment-container {
+  margin-top: 10px;
+}
+
+.comment-info {
+  font-weight: 600;
+}
+
+.comment-text {
+  margin-left: 7px;
+  white-space: pre-line;
 }
 
 /* Custom scroll bar
@@ -710,7 +729,7 @@ below the long text would expand the table width. */
 /* Wrap long text in the 'Old' and 'New' column if there is not enough space */
 .tag-table-container td:nth-child(2),
 .tag-table-container td:nth-child(3) {
-    overflow-wrap: anywhere;
+  overflow-wrap: anywhere;
 }
 
 /* Truncate text in table on small screens */

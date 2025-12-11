@@ -1106,6 +1106,7 @@ function run() {
             vandalismChecker();//Analyse each changeset and create boolean "possibleVandalism" within "changesets" object
             renderChangesetsList(changesets);//Render changesets list on the left side
             fetchAndDisplayUserDetails(changesets);//After the whole data is loaded and rendered download some 'nice-to-have' user data (total edits & sign-up date) and add it to the changeset information
+            fetchAndDisplayChangesetDiscussions(changesets);//After the whole data is loaded and rendered download changeset discussions and add it to the changeset information
         })
         .catch(function (error) { // ERROR handler for ANY error in the Promise chain above
             if (error.name === 'AbortError') {
@@ -1175,9 +1176,9 @@ function fetchAndDisplayUserDetails(changesetsToDisplay) {
 
             // 5. Update the DOM with the fetched data
             // Select all result list items that have a 'osm-user-id' attribute
-            d3.selectAll('.result[data-osm-user-id]').each(function () {
+            d3.selectAll('.result[user-id]').each(function () {
                 const li = d3.select(this);
-                const userId = li.attr('data-osm-user-id');
+                const userId = li.attr('user-id');
                 // console.log(userId);
                 const userData = changesets.userData[userId];
                 // console.log(userData);
@@ -1196,6 +1197,89 @@ function fetchAndDisplayUserDetails(changesetsToDisplay) {
             // If the API call fails, we just log it and do nothing. The UI will simply not show the extra info.
             console.warn("Could not fetch extended user details:", error.message);
         });
+}
+
+// --- Fourth API call: Fetch changeset comments from the OSM API and update the UI. ---
+// As of 2025 the OSM API only allows to download changeset comments for one changeset at a time
+async function fetchAndDisplayChangesetDiscussions(changesetsToDisplay) {
+    // 1. Collect all changeset numbers, where discussionCount > 0
+    const changesetsWithDiscussions = [];
+    for (const id in changesetsToDisplay) {
+        if (changesetsToDisplay[id].discussionCount > 0) {
+            changesetsWithDiscussions.push(id);
+        }
+    }
+    // console.log(changesetsWithDiscussions);
+
+    //Return early if there are no changesets with discussions
+    if (changesetsWithDiscussions.length === 0) return;
+
+    // Get the current abort signal
+    const signal = window.currentAbortController ? window.currentAbortController.signal : null;
+
+    // 2. Iterate over each changeset ID and fetch its discussion
+    for (const changesetID of changesetsWithDiscussions) {
+
+        // Check if aborted before starting the next request
+        if (signal && signal.aborted) {
+            console.log("Fetch discussions aborted.");
+            break;
+        }
+
+        const url = debugMode
+            ? "./examples/exampleDiscussions.json"
+            : `https://api.openstreetmap.org/api/0.6/changeset/${changesetID}.json?include_discussion=true`;
+
+        try {
+            // 3. Await the fetch. This ensures requests are done sequentially (1 by 1),
+            // preventing API rate limiting issues or browser network congestion.
+            const response = await fetch(url, { signal: signal });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            // Update the main object (the discussion data in the changesets object is used, when the changesets list is filtered and thus rerendered)
+            const discussion = data.changeset.comments;
+
+            // 4. Update the DOM
+
+            // Select the discussion heading and unhide it
+            const discussionHeading = d3.select(`[changeset-id="${changesetID}"] .changeset-discussion-heading`);
+            discussionHeading.classed('hide', false);
+
+            // Select the discussion container for this changeset
+            const discussionTR = d3.select(`[changeset-id="${changesetID}"] .changeset-discussion`);
+
+            // Loop through each comment and append it to the discussion container
+            for (let j = 0; j < discussion.length; j++) {
+                const comment = discussion[j];
+                const singleCommentDiv = discussionTR.append('article')
+                    .classed('comment-container', true);
+
+                singleCommentDiv.append('div')
+                    .classed('comment-info', true)
+                    .html(`
+                        Comment from <a href="https://www.openstreetmap.org/user/${comment.user}" target="_blank" rel="noopener noreferrer" title="Go to OSM user page of ${comment.user}">${comment.user}</a> ${moment(comment.date).fromNow()}
+                    `);
+
+                singleCommentDiv.append('div')
+                    .classed('comment-text', true)
+                    .text(comment.text);
+            }
+            //Write discussion HTML to changeset object for future use (i.e. when filtering the changesets list)
+            changesets[changesetID].discussionHTML = discussionTR.html();
+
+        } catch (error) {
+            if (error.name === 'AbortError') {
+                // Silent return/break on abort
+                return;
+            }
+            console.warn(`Could not fetch discussions for changeset ${changesetID}:`, error.message);
+        }
+    }
 }
 
 /* Sort GeoJSON features by geometry type and size.
@@ -1261,7 +1345,8 @@ function renderChangesetsList(changesetsToDisplay) {
     const rl = allresults.enter()
         .append('li')
         .attr('class', 'result')
-        .attr('data-osm-user-id', d => d.userId)
+        .attr('changeset-id', d => d.id)
+        .attr('user-id', d => d.userId)
         // .attr('title', 'Changeset is highlighted on map')
         .style('color', d => changesets[d.id].color)
         .on('click', (event, d) => click(null, d))//Highlight changeset on click (desktop/mobile) - Pass null for feature, d for data
@@ -1455,8 +1540,8 @@ function renderChangesetsList(changesetsToDisplay) {
                 </tr>`;
 
             // Infos regarding the "User Experience" data: After executing run() the user data (i.e. total edits & sign-up date) has not been
-            // downloaded and written into the 'changesets' object yet. When using the filter function the data is already in 'changesets'.
-            // That is why we check if 'changesets.userData?.[d.userId]' is available or not.
+            // downloaded and written into the 'changesets' object yet. When using the filter function the user data is already in 'changesets' though.
+            // That is why we check if 'changesets.userData?.[d.userId]' is available or not. The same is true for the discussion data further down.
             let tableHtml = `
                     <tbody>
                         <tr class="table-heading">
@@ -1497,15 +1582,18 @@ function renderChangesetsList(changesetsToDisplay) {
                             <td>${changesets[d.id].deltaInTags}</td>
                         </tr>
                         ${usedEditorWasId ? htmlForIdWarningsCheck : ""}
+                        <tr class="changeset-discussion-heading table-heading ${!(changesets[d.id].discussionHTML) ? "hide" : ""}">
+                            <td colspan="2">Discussion</td>
+                        </tr>
+                        <tr>
+                            <td class="changeset-discussion" colspan="2">
+                                ${!(changesets[d.id].discussionHTML) ? "" : changesets[d.id].discussionHTML}
+                            </td>
+                        </tr>
                     </tbody>`;
             return tableHtml;
         })
 }
-
-/*
-in case you want the traffic light in the table above:
-<div class="traffic-light"><span class="${changesets[d.id].deltaInNodesWays < vandalismThreshold ? "red" : "gray"}"></span><span class="${changesets[d.id].deltaInNodesWays < vandalismThreshold ? "gray" : "green"}"></span></div>
-*/
 
 //Highlight clicked layer on map and in sidebar (happens when selecting element in sidebar or on map)
 // eventOrFeature can be a Leaflet GeoJSON feature (from map click) or null (from sidebar click/hover)
