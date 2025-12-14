@@ -1504,7 +1504,7 @@ function renderChangesetsList(changesetsToDisplay) {
     //Changeset comment
     rl.append('a')
         .classed('changeset-comment', true)
-        .attr('href', d => `https://openstreetmap.org/browse/changeset/${d.id}`)
+        .attr('href', d => `https://www.openstreetmap.org/changeset/${d.id}`)
         .attr('target', '_blank')
         .attr('title', d => `Go to OSM changeset page\n\n${changesets[d.id].comment}`)
         //Changeset title (was downloaded separately from OSM API)
