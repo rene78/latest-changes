@@ -745,96 +745,135 @@ function run() {
 
             //Create tag comparison table
             function createTable(id) {
-                {
-                    const node = data.querySelectorAll('[id="' + id + '"]');
-                    //First check what type of action has been performed on the element (i.e. create, modify, delete)
-                    let action = node[0].parentNode.parentNode.getAttribute('type');//Check if action is "modify", "delete" or "null"
-                    if (!action) action = "create";//The xml data structure is different for "create" nodes, thus action will be "null" in the line above
-                    // console.log(action);
+                const node = data.querySelectorAll('[id="' + id + '"]');
+                //First check what type of action has been performed on the element (i.e. create, modify, delete)
+                let action = node[0].parentNode.parentNode.getAttribute('type');//Check if action is "modify", "delete" or "null"
+                if (!action) action = "create";//The xml data structure is different for "create" nodes, thus action will be "null" in the line above
+                // console.log(action);
 
-                    //Create header with type of action (i.e. create, modify or delete), type of element (i.e. node or way), OSM id and link to 'OSM Deep History'.
-                    let tableHtml = `
-                        <span class="${action} capitalize">${action}</span>
-                        ${node[0].nodeName}
-                        <a href="https://www.openstreetmap.org/${node[0].nodeName}/${node[0].getAttribute("id")}" target="_blank" rel="noopener noreferrer">${node[0].getAttribute("id")}</a>
-                        <a href="http://osmlab.github.io/osm-deep-history/#/${node[0].nodeName}/${node[0].getAttribute("id")}" title="Get complete history of element in 'OSM Deep History'" target="_blank" rel="noopener noreferrer">
-                            <svg class="clock-with-circular-arrow-symbol"><use href="img/icons.svg#clock-with-circular-arrow"></use></svg>
-                        </a>
-                        <table class="tag-table-container">
-                    `;
+                // Helper functions to create OSM wiki links from OSM tags and URL links if URL is detected
+                // Creation of link from key (e.g. highway --> link to OSM wiki page of "Key:highway")
+                function linkKey (k) {
+                    const url = `https://wiki.openstreetmap.org/wiki/Key:${encodeURIComponent(k)}`;
+                    return `<a href="${url}" target="_blank" rel="noopener noreferrer">${k}</a>`;
+                };
 
-                    //Object with all key-value pairs for new and old feature and relevant meta tags for table
-                    const keyvalues = { old: { meta: {}, tags: {} }, new: { meta: {}, tags: {} } };
+                // Creation of link from value (e.g. motorway --> link to OSM wiki page of "Value:highway=motorway" or linkify URL)
+                function linkValue (k, v) {
+                    if (!v || v === "") return "";
 
-                    //1 CREATE
-                    if (action === "create") {
-                        //Copy meta tags
-                        const keysNew = node[0].querySelectorAll("tag");
-
-                        //Create table
-                        tableHtml += `
-                            <thead>
-                                <tr>
-                                    <th>Tag</th>
-                                    <th>New</th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                <tr class="metatags">
-                                    <td>version</td>
-                                    <td>${node[0].getAttribute("version")}</td>
-                                </tr>
-                                <tr class="metatags">
-                                    <td>timestamp</td>
-                                    <td>${moment(node[0].getAttribute("timestamp")).fromNow()}</td>
-                                </tr>
-                                <tr class="metatags">
-                                    <td>user</td>
-                                    <td>${node[0].getAttribute("user")}</td>
-                                </tr>
-                        `;
-
-                        for (let i = 0; i < keysNew.length; i++) {
-                            tableHtml += `
-                                <tr class="create">
-                                    <td>${keysNew[i].getAttribute('k')}</td>
-                                    <td>${keysNew[i].getAttribute('v')}</td>
-                                </tr>
-                                `
+                    // 1. Direct URL keys: treat the whole value as a link
+                    if (/^(website|contact:website|url|image|mapillary|flickr)$/i.test(k)) {
+                        let url = v;
+                        // Prepend http:// if missing (for www. entries in website tags)
+                        if (!/^https?:\/\//i.test(url) && !/^ftp:\/\//i.test(url)) {
+                            url = 'http://' + url;
                         }
+                        return `<a href="${url}" target="_blank" rel="noopener noreferrer">${v}</a>`;
                     }
 
-                    //2 MODIFY/DELETE
-                    else {
-                        //Create Set with all unique key-values from old and new
-                        const uniqueKeysSet = new Set();
-                        //Start with old
-                        //Copy meta tags
-                        keyvalues.old.meta["version"] = node[0].getAttribute("version");
-                        keyvalues.old.meta["timestamp"] = moment(node[0].getAttribute("timestamp")).fromNow();
-                        keyvalues.old.meta["user"] = node[0].getAttribute("user");
-                        const keysOld = node[0].querySelectorAll("tag");
-                        for (let i = 0; i < keysOld.length; i++) {
-                            keyvalues.old.tags[keysOld[i].getAttribute('k')] = keysOld[i].getAttribute('v');
-                            uniqueKeysSet.add(keysOld[i].getAttribute('k'));
-                        }
-                        //Continue with new
-                        //Copy meta tags
-                        keyvalues.new.meta["version"] = node[1].getAttribute("version");
-                        keyvalues.new.meta["timestamp"] = moment(node[1].getAttribute("timestamp")).fromNow();
-                        keyvalues.new.meta["user"] = node[1].getAttribute("user");
-                        const keysNew = node[1].querySelectorAll("tag");
-                        for (let i = 0; i < keysNew.length; i++) {
-                            keyvalues.new.tags[keysNew[i].getAttribute('k')] = keysNew[i].getAttribute('v');
-                            uniqueKeysSet.add(keysNew[i].getAttribute('k'));
-                        }
-                        // console.log(keyvalues);
-                        //Create array in which all keys are ordered alphabetically
-                        const uniqueKeysArr = Array.from(uniqueKeysSet).sort();
-                        // console.log(uniqueKeysArr);
+                    // 2. Free text fields that might CONTAIN URLs: use linkify()
+                    if (/^(note|description|comment|source|fixme|todo|opening_hours|color|contact)/i.test(k)) {
+                        return linkify(escapeHtml(v));
+                    }
 
-                        //Create table
+                    // 3. Skip Wiki linking for names, refs, phones, emails, addr:*, numeric values, etc.
+                    const isNoWikiLink = /^(name|note|description|comment|source|ref|phone|website|email|addr:|tiger:|gnis:|created_by|fixme|todo|opening_hours|color|operator|contact:|start_date|brand|disused:|demolished:|branch|check_date)/i.test(k) || !isNaN(v.replace(",", "."));
+
+                    if (isNoWikiLink) {
+                        return v;
+                    }
+
+                    // 4. Default: Wiki Link
+                    const url = `https://wiki.openstreetmap.org/wiki/Tag:${encodeURIComponent(k)}=${encodeURIComponent(v)}`;
+                    return `<a href="${url}" target="_blank" rel="noopener noreferrer">${v}</a>`;
+                };
+
+                //Create header with type of action (i.e. create, modify or delete), type of element (i.e. node or way), OSM id and link to 'OSM Deep History'.
+                let tableHtml = `
+                    <span class="${action} capitalize">${action}</span>
+                    ${node[0].nodeName}
+                    <a href="https://www.openstreetmap.org/${node[0].nodeName}/${node[0].getAttribute("id")}" target="_blank" rel="noopener noreferrer">${node[0].getAttribute("id")}</a>
+                    <a href="http://osmlab.github.io/osm-deep-history/#/${node[0].nodeName}/${node[0].getAttribute("id")}" title="Get complete history of element in 'OSM Deep History'" target="_blank" rel="noopener noreferrer">
+                        <svg class="clock-with-circular-arrow-symbol"><use href="img/icons.svg#clock-with-circular-arrow"></use></svg>
+                    </a>
+                    <table class="tag-table-container">
+                `;
+
+                //Object with all key-value pairs for new and old feature and relevant meta tags for table
+                const keyvalues = { old: { meta: {}, tags: {} }, new: { meta: {}, tags: {} } };
+
+                //1 CREATE
+                if (action === "create") {
+                    //Copy meta tags
+                    const keysNew = node[0].querySelectorAll("tag");
+
+                    //Create table
+                    tableHtml += `
+                        <thead>
+                            <tr>
+                                <th>Tag</th>
+                                <th>New</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr class="metatags">
+                                <td>version</td>
+                                <td>${node[0].getAttribute("version")}</td>
+                            </tr>
+                            <tr class="metatags">
+                                <td>timestamp</td>
+                                <td>${moment(node[0].getAttribute("timestamp")).fromNow()}</td>
+                            </tr>
+                            <tr class="metatags">
+                                <td>user</td>
+                                <td>${node[0].getAttribute("user")}</td>
+                            </tr>
+                    `;
+
+                    for (let i = 0; i < keysNew.length; i++) {
+                        const k = keysNew[i].getAttribute('k');
+                        const v = keysNew[i].getAttribute('v');
                         tableHtml += `
+                            <tr class="create">
+                                <td>${linkKey(k)}</td>
+                                <td>${linkValue(k, v)}</td>
+                            </tr>
+                        `;
+                    }
+                }
+
+                //2 MODIFY/DELETE
+                else {
+                    //Create Set with all unique key-values from old and new
+                    const uniqueKeysSet = new Set();
+                    //Start with old
+                    //Copy meta tags
+                    keyvalues.old.meta["version"] = node[0].getAttribute("version");
+                    keyvalues.old.meta["timestamp"] = moment(node[0].getAttribute("timestamp")).fromNow();
+                    keyvalues.old.meta["user"] = node[0].getAttribute("user");
+                    const keysOld = node[0].querySelectorAll("tag");
+                    for (let i = 0; i < keysOld.length; i++) {
+                        keyvalues.old.tags[keysOld[i].getAttribute('k')] = keysOld[i].getAttribute('v');
+                        uniqueKeysSet.add(keysOld[i].getAttribute('k'));
+                    }
+                    //Continue with new
+                    //Copy meta tags
+                    keyvalues.new.meta["version"] = node[1].getAttribute("version");
+                    keyvalues.new.meta["timestamp"] = moment(node[1].getAttribute("timestamp")).fromNow();
+                    keyvalues.new.meta["user"] = node[1].getAttribute("user");
+                    const keysNew = node[1].querySelectorAll("tag");
+                    for (let i = 0; i < keysNew.length; i++) {
+                        keyvalues.new.tags[keysNew[i].getAttribute('k')] = keysNew[i].getAttribute('v');
+                        uniqueKeysSet.add(keysNew[i].getAttribute('k'));
+                    }
+                    // console.log(keyvalues);
+                    //Create array in which all keys are ordered alphabetically
+                    const uniqueKeysArr = Array.from(uniqueKeysSet).sort();
+                    // console.log(uniqueKeysArr);
+
+                    //Create table
+                    tableHtml += `
                             <thead>
                                 <tr>
                                     <th>Tag</th>
@@ -860,49 +899,49 @@ function run() {
                                 </tr>
                             `;
 
-                        //Traverse uniqueKeysArray and check in object which value this key has in new and old
-                        for (let i = 0; i < uniqueKeysArr.length; i++) {
-                            let oldTag = keyvalues.old.tags[uniqueKeysArr[i]];
-                            let newTag = keyvalues.new.tags[uniqueKeysArr[i]];
-                            let cssClass;
-                            //Case 1: Tag deleted in new --> Background color red, change from "undefined" to ""
-                            if (!newTag) {
-                                cssClass = "delete";
-                                newTag = "";
-                            }
-                            //Case 2: Tag created in new --> Background color green, change from "undefined" to ""
-                            else if (!oldTag) {
-                                cssClass = "create";
-                                oldTag = "";
-                            }
-                            //Case 3: Tag different in new --> Background color yellow
-                            else if (oldTag !== newTag) cssClass = "modify";
-
-                            //Case 4: Tags similar --> Default (i.e. no) background color
-                            else cssClass = "unchanged";
-
-                            tableHtml += `
-                                <tr ${(cssClass ? 'class=' + cssClass : '')}>
-                                    <td>${uniqueKeysArr[i]}</td>
-                                    <td>${oldTag}</td>
-                                    <td>${newTag}</td>
-                                </tr>
-                                `
+                    //Traverse uniqueKeysArray and check in object which value this key has in new and old
+                    for (let i = 0; i < uniqueKeysArr.length; i++) {
+                        const key = uniqueKeysArr[i];
+                        let oldTag = keyvalues.old.tags[key];
+                        let newTag = keyvalues.new.tags[key];
+                        let cssClass;
+                        //Case 1: Tag deleted in new --> Background color red, change from "undefined" to ""
+                        if (!newTag) {
+                            cssClass = "delete";
+                            newTag = "";
                         }
+                        //Case 2: Tag created in new --> Background color green, change from "undefined" to ""
+                        else if (!oldTag) {
+                            cssClass = "create";
+                            oldTag = "";
+                        }
+                        //Case 3: Tag different in new --> Background color yellow
+                        else if (oldTag !== newTag) cssClass = "modify";
+
+                        //Case 4: Tags similar --> Default (i.e. no) background color
+                        else cssClass = "unchanged";
+
+                        tableHtml += `
+                            <tr ${(cssClass ? 'class=' + cssClass : '')}>
+                                <td>${linkKey(key)}</td>
+                                <td>${linkValue(key, oldTag)}</td>
+                                <td>${linkValue(key, newTag)}</td>
+                            </tr>
+                        `;
                     }
-
-                    tableHtml += `
-                            </tbody>
-                        </table>
-                    `;
-
-                    //Create link to edit geometry in iD editor (only if element has not been deleted - deleted elements cannot be edited)
-                    if (action !== "delete") {
-                        tableHtml += `<a href="https://www.openstreetmap.org/edit?${node[0].nodeName}=${node[0].getAttribute("id")}" target="_blank" rel="noopener noreferrer">Edit in iD</a>`;
-                    }
-
-                    return tableHtml;
                 }
+
+                tableHtml += `
+                    </tbody>
+                        </table>
+                `;
+
+                //Create link to edit geometry in iD editor (only if element has not been deleted - deleted elements cannot be edited)
+                if (action !== "delete") {
+                    tableHtml += `<a href="https://www.openstreetmap.org/edit?${node[0].nodeName}=${node[0].getAttribute("id")}" target="_blank" rel="noopener noreferrer">Edit in iD</a>`;
+                }
+
+                return tableHtml;
             }
 
             // --- Start of the second async API call ---
@@ -1267,7 +1306,7 @@ async function fetchAndDisplayChangesetDiscussions(changesetsToDisplay) {
 
                 singleCommentDiv.append('div')
                     .classed('comment-text', true)
-                    .text(comment.text);
+                    .html(linkify(escapeHtml(comment.text))); // Escape HTML and linkify URLs
             }
             //Write discussion HTML to changeset object for future use (i.e. when filtering the changesets list)
             changesets[changesetID].discussionHTML = discussionTR.html();
@@ -1479,7 +1518,7 @@ function renderChangesetsList(changesetsToDisplay) {
                 // Only after collapse transition ends, restore truncation. Else it looks very choppy.
                 setTimeout(() => {
                     changesetComment.classList.remove('expanded');
-                    changesetComment.innerText = d.comment;
+                    changesetComment.innerHTML = linkify(d.comment);
                 }, 300);
                 // Update tooltip when hovering over arrow
                 arrowDiv.attr('title', 'Open changeset information');
@@ -1509,7 +1548,9 @@ function renderChangesetsList(changesetsToDisplay) {
         .attr('title', d => `Go to OSM changeset page\n\n${changesets[d.id].comment}`)
         //Changeset title (was downloaded separately from OSM API)
         .html((d) => {// d.comment might contain HTML highlights from filtering
-            return d.comment || '<span class="no-comment">—</span>';
+            // We apply linkify to make URLs clickable. 
+            // Note: If a URL matches the search term, the highlighting <mark> might interfere with the <a> tag creation, but this is a rare edge case.
+            return linkify(d.comment) || '<span class="no-comment">—</span>';
         })
 
     //Changeset details. Appears after clicking on the arrow button
@@ -1764,6 +1805,36 @@ function filterChangesets() {
             }
         });
     }
+}
+
+// --- Helper Functions for URL Linking ---
+
+// Escapes HTML characters to prevent XSS and broken layout
+function escapeHtml(text) {
+    if (!text) return text;
+    return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+// Converts text URLs into clickable HTML <a> tags
+function linkify(inputText) {
+    if (!inputText) return "";
+
+    // Pattern for http/https/ftp URLs
+    const protocolPattern = /(\b(https?|ftp):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/gim;
+    /* Replace the URL within the input text with the URL wrapped in an anchor tag
+    Example: "Visit http://osm.org" becomes 'Visit <a href="http://osm.org" target="_blank" rel="noopener noreferrer">http://example.com</a>' */
+    let replacedText = inputText.replace(protocolPattern, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+
+    // Pattern for "www." URLs (add http:// automatically)
+    const wwwPattern = /(^|[^\/])(www\.[\S]+(\b|$))/gim;
+    replacedText = replacedText.replace(wwwPattern, '$1<a href="http://$2" target="_blank" rel="noopener noreferrer">$2</a>');
+
+    return replacedText;
 }
 
 //Show a modal with a message

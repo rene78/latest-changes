@@ -359,6 +359,8 @@
     <tag k="name" v="foobar"/>
     <tag k="description" v="Only a test"/>
     <tag k="foo" v="bar"/>
+    <tag k="website" v="www.osm.org"/>
+    <tag k="source:url" v="www.osm.org"/>
   </node>
 </old>
 <new>

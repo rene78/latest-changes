@@ -732,6 +732,15 @@ below the long text would expand the table width. */
   overflow-wrap: anywhere;
 }
 
+.tag-table-container a {
+  text-decoration: none;
+  color: #004764;
+}
+
+.tag-table-container a:hover {
+  text-decoration: underline;
+}
+
 /* Truncate text in table on small screens */
 @media (max-width: 600px) {
   .tag-table-container td {
@@ -743,11 +752,11 @@ below the long text would expand the table width. */
 }
 
 .create {
-  background-color: #b9ffb9;
+  background-color: #c8ffc8;
 }
 
 .delete {
-  background-color: #ff9494;
+  background-color: #ffcccc;
 }
 
 .modify {
