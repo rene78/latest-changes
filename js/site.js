@@ -753,13 +753,13 @@ function run() {
 
                 // Helper functions to create OSM wiki links from OSM tags and URL links if URL is detected
                 // Creation of link from key (e.g. highway --> link to OSM wiki page of "Key:highway")
-                function linkKey (k) {
+                function linkKey(k) {
                     const url = `https://wiki.openstreetmap.org/wiki/Key:${encodeURIComponent(k)}`;
-                    return `<a href="${url}" target="_blank" rel="noopener noreferrer">${k}</a>`;
+                    return `<a title="Go to OSM Wiki page of this tag"href="${url}" target="_blank" rel="noopener noreferrer">${k}</a>`;
                 };
 
                 // Creation of link from value (e.g. motorway --> link to OSM wiki page of "Value:highway=motorway" or linkify URL)
-                function linkValue (k, v) {
+                function linkValue(k, v) {
                     if (!v || v === "") return "";
 
                     // 1. Direct URL keys: treat the whole value as a link
@@ -778,7 +778,7 @@ function run() {
                     }
 
                     // 3. Skip Wiki linking for names, refs, phones, emails, addr:*, numeric values, etc.
-                    const isNoWikiLink = /^(name|note|description|comment|source|ref|phone|website|email|addr:|tiger:|gnis:|created_by|fixme|todo|opening_hours|color|operator|contact:|start_date|brand|disused:|demolished:|branch|check_date)/i.test(k) || !isNaN(v.replace(",", "."));
+                    const isNoWikiLink = /^(name|note|description|comment|source|ref|phone|mobile|website|email|addr:|tiger:|gnis:|created_by|fixme|todo|opening_hours|color|operator|contact:|start_date|brand|disused:|demolished:|branch|check_date)/i.test(k) || !isNaN(v.replace(",", "."));
 
                     if (isNoWikiLink) {
                         return v;
@@ -786,7 +786,7 @@ function run() {
 
                     // 4. Default: Wiki Link
                     const url = `https://wiki.openstreetmap.org/wiki/Tag:${encodeURIComponent(k)}=${encodeURIComponent(v)}`;
-                    return `<a href="${url}" target="_blank" rel="noopener noreferrer">${v}</a>`;
+                    return `<a title="Go to OSM Wiki page of this tag" href="${url}" target="_blank" rel="noopener noreferrer">${v}</a>`;
                 };
 
                 //Create header with type of action (i.e. create, modify or delete), type of element (i.e. node or way), OSM id and link to 'OSM Deep History'.
@@ -827,7 +827,9 @@ function run() {
                             </tr>
                             <tr class="metatags">
                                 <td>user</td>
-                                <td>${node[0].getAttribute("user")}</td>
+                                <td>
+                                    <a title="Go to OSM user page of ${node[0].getAttribute("user")}" target="_blank" href="//openstreetmap.org/user/${node[0].getAttribute("user")}">${node[0].getAttribute("user")}</a>
+                                </td>
                             </tr>
                     `;
 
@@ -894,8 +896,12 @@ function run() {
                                 </tr>
                                 <tr class="metatags">
                                     <td><div>user</td>
-                                    <td>${keyvalues.old.meta["user"]}</td>
-                                    <td>${keyvalues.new.meta["user"]}</td>
+                                    <td>
+                                        <a title="Go to OSM user page of ${keyvalues.old.meta["user"]}" target="_blank" href="//openstreetmap.org/user/${keyvalues.old.meta["user"]}">${keyvalues.old.meta["user"]}</a>
+                                    </td>
+                                    <td>
+                                        <a title="Go to OSM user page of ${keyvalues.new.meta["user"]}" target="_blank" href="//openstreetmap.org/user/${keyvalues.new.meta["user"]}">${keyvalues.new.meta["user"]}</a>
+                                    </td>
                                 </tr>
                             `;
 
