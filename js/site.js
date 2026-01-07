@@ -1235,6 +1235,12 @@ function fetchAndDisplayUserDetails(changesetsToDisplay) {
                     // Update the table cells with the new data
                     li.select('.user-changesets-count').text(userData.changesetCount.toLocaleString());
                     li.select('.user-time-since-signup').text(moment(userData.accountCreated).fromNow());
+
+                    // Update the title of '.user-name' link to include total changesets and signup date
+                    const userNameLink = li.select('.user-name');
+                    const originalTitle = userNameLink.attr('title') || '';
+                    const newTitle = `\n\nTotal changesets: ${userData.changesetCount.toLocaleString()}\nSigned up: ${moment(userData.accountCreated).fromNow()}`;
+                    userNameLink.attr('title', originalTitle ? originalTitle + newTitle : newTitle);
                 }
             });
         })
@@ -1485,7 +1491,11 @@ function renderChangesetsList(changesetsToDisplay) {
             // Get unaltered user name from changesets. The value in d.user might have html in it if filtered,
             // e.g. <span class="highlight">rene</span>78. We don't want that in the title and href.
             const unalteredUserName = changesets[d.id].user;
-            return 'Go to OSM user page of ' + unalteredUserName;
+            let titleText = `Go to OSM user page of ${unalteredUserName}`;
+            // If we have extended user data, add total changesets and signup date to the title
+            if (changesets.userData?.[d.userId]) {
+                return `${titleText}\n\nTotal changesets: ${changesets.userData?.[d.userId]?.changesetCount}\nSigned up: ${moment(changesets.userData?.[d.userId]?.accountCreated).fromNow()}`;
+            } else return titleText;
         })
         .attr('target', '_blank')
         .attr('href', function (d) {
