@@ -344,6 +344,7 @@ user name is truncated if it takes up too much space*/
   transition: all 0.2s ease;
 }
 
+/* Design of button when pressed */
 .result .arrow:active {
   box-shadow: 0 0 2px darkslategray;
   transform: translateY(2px);
@@ -404,7 +405,7 @@ user name is truncated if it takes up too much space*/
 
 /* Color the right border of the first column in black. Increase the font weight of all the text in this column.
 Exclude all table headings and the changeset discussion section from this rule*/
-.changeset-table tr:not(.table-heading):not(:has(td.changeset-discussion)) td:nth-child(1) {
+.changeset-table tr:not(.table-heading):not(:has(td.changeset-discussion)):not(:has(div.deleted-elements-button-container)) td:nth-child(1) {
   border-right: 1px solid black;
   font-weight: 600;
 }
@@ -464,6 +465,51 @@ below the long text would expand the table width. */
 .comment-text {
   margin-left: 7px;
   white-space: pre-line;
+}
+
+/* Container to let buttons to highlight deleted elements wrap nicely */
+.deleted-elements-button-container {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  /* Space between buttons */
+  margin: 4px;
+}
+
+/* The button to highlight deleted elements itself */
+.center-map-on-feature {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 6px;
+  padding: 14px 10px;
+  /* Generous padding for touch targets */
+  font-size: 0.9rem;
+  background-color: #e5e5e5;
+  box-shadow: 0 2px 4px darkslategrey;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+/* Hover/Active State */
+.center-map-on-feature:hover {
+  background-color: #eee;
+}
+
+.center-map-on-feature:active {
+  box-shadow: 0 0 2px darkslategray;
+  transform: translateY(2px);
+}
+
+/* Style the SVG Icon inside the button */
+.center-map-on-feature svg {
+  width: 20px;
+  height: 20px;
+  stroke: #777;
+  pointer-events: none;
+  /* Ensures click event hits the button, not the SVG */
 }
 
 /* Custom scroll bar

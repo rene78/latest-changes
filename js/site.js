@@ -461,6 +461,7 @@ function run() {
                     changesets[changesetNumber] = {
                         color,
                         comment: '',
+                        deletedFeatures: [],
                         deltaInIdWarningsAndResolves: 0, // Initialize
                         deltaInNodesWays: 0,
                         deltaInTags: 0,
@@ -742,6 +743,10 @@ function run() {
                     .setContent(tableHtml)
                     .openOn(map);
             });
+
+            // Expose createTable to global scope so sidebar clicks can use it (i.e. clicking on the button of a deleted feature in order to center map and open popup)
+            // 'window' allows the function to "remember" the specific data variable from the specific fetch request that created it.
+            window.createTagComparisonTable = createTable;
 
             //Create tag comparison table
             function createTable(id) {
@@ -1129,7 +1134,12 @@ function run() {
                             //If a node with 0 tags has been deleted: Do not subtract it from deltaInNodesWays
                             // (normally it is just a newly deleted node of an already existing way)
                             if (elementType === "node" && nTagsDeleted == 0) continue;
-                            else changesets[changesetNumber].deltaInNodesWays--;
+                            else {
+                                //Decrement number of nodes/ways count
+                                changesets[changesetNumber].deltaInNodesWays--;
+                                //Add id of deleted feature to 'deletedFeatures' array within 'changesets' object
+                                changesets[changesetNumber].deletedFeatures.push(oldElementNode.getAttribute("id"));
+                            }
                         }
                     }
                 }
@@ -1415,7 +1425,7 @@ function renderChangesetsList(changesetsToDisplay) {
             if (changesets[d.id] && changesets[d.id].leafletFeatureGroup) {
                 const groupToZoom = changesets[d.id].leafletFeatureGroup;
                 const bounds = groupToZoom.getBounds();
-                map.fitBounds(bounds);
+                map.fitBounds(bounds, { padding: [50, 50] });//Add padding so that features are not directly at the edge of the map
             }
 
             //On small screens (screen width < 601px) scroll all the way down, so that map is completely visible on screen
@@ -1639,6 +1649,23 @@ function renderChangesetsList(changesetsToDisplay) {
                             <td>${changesets[d.id].deltaInTags}</td>
                         </tr>
                         ${usedEditorWasId ? htmlForIdWarningsCheck : ""}
+                        <tr class="table-heading">
+                            <td colspan="2" title="Deleted nodes or ways. Please check if deletion is really necessary. A lifecycle tag like 'demolished:' or 'disused:' might be more appropriate.">Deleted Elements</td>
+                        </tr>
+                        <tr>
+                            <td colspan="2">
+                                <div class="deleted-elements-button-container">
+                                    ${changesets[d.id].deletedFeatures?.length
+                                        ? changesets[d.id].deletedFeatures.map(featureId => `
+                                            <button class="center-map-on-feature" feature-id="${featureId}" title="Zoom to deleted element ${featureId}">
+                                                <svg><use href="img/icons.svg#loupe"></use></svg>
+                                                ${featureId}
+                                            </button>`).join("")
+                                        : "none"
+                                    }
+                                </div>
+                            </td>
+                        </tr>
                         <tr class="changeset-discussion-heading table-heading ${!(changesets[d.id].discussionHTML) ? "hide" : ""}">
                             <td colspan="2">Discussion</td>
                         </tr>
@@ -1935,4 +1962,58 @@ sidebar.addEventListener("scroll", event => {
     // console.log(sidebar.scrollTop);
     if (sidebar.scrollTop > 50) toTop.classList.remove("hide");//display to-top button
     else toTop.classList.add("hide");//hide to-top button
+});
+
+//Click sidebar button to center map on deleted feature and open tag comparison table
+document.getElementById('results').addEventListener('click', (e) => {
+    // Check if the click originated inside one of our buttons
+    const button = e.target.closest('.center-map-on-feature');
+    // console.log(button);
+
+    if (button) {
+        const osmFeatureId = button.getAttribute('feature-id');
+        // console.log(osmFeatureId);
+
+        // Deleted features are stored with 'o' suffix (old version) in the Leaflet layer group
+        const layerId = osmFeatureId + 'o';
+
+        const layer = changesets.allLeafletLayers.getLayer(layerId);
+
+        if (layer) {
+            // 1. Center map to feature
+            let popupLocation;
+
+            // Check if the layer has bounds (Ways/Polygons) or just a point (Nodes)
+            if (typeof layer.getBounds === 'function') {
+                // It is a Way or Polygon
+                const bounds = layer.getBounds();
+                map.fitBounds(bounds, { padding: [50, 50] }); // Zoom to fit bounds with padding
+                popupLocation = bounds.getCenter(); // Place popup in center of line or polygon
+            } else if (typeof layer.getLatLng === 'function') {
+                // It is a Node (Marker/CircleMarker)
+                popupLocation = layer.getLatLng();
+                map.setView(popupLocation, 19); // Zoom directly to the node
+            }
+
+            // 2. Open Tag Comparison Table Popup
+            if (window.createTagComparisonTable) {
+                const tableHtml = window.createTagComparisonTable(osmFeatureId);
+                let mapContainer = document.querySelector(".map-container");
+
+                L.popup({
+                    maxWidth: mapContainer.clientWidth - 45,
+                    maxHeight: mapContainer.clientHeight - 40,
+                    className: "stylePopup"
+                })
+                    .setLatLng(popupLocation)
+                    .setContent(tableHtml)
+                    .openOn(map);
+            }
+        } else {
+            console.warn(`Layer for deleted element ${osmFeatureId} not found on map.`);
+            // This happens if the element was deleted but wasn't in the initial Overpass bbox download
+            // or filtered out for having null coordinates.
+        }
+
+    }
 });

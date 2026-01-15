@@ -354,19 +354,42 @@
 </action>
 <action type="delete">
 <old>
-  <node id="1501" lat="47.65" lon="9.47" version="1" timestamp="2013-07-01T09:01:11Z" changeset="496" uid="42" user="thisIsASuperLongUserName">
+  <node id="1111111111" lat="47.65" lon="9.47" version="1" timestamp="2013-07-01T09:01:11Z" changeset="496" uid="42" user="thisIsASuperLongUserName">
     <tag k="amenity" v="bar"/>
     <tag k="name" v="foobar"/>
     <tag k="description" v="Only a test"/>
     <tag k="foo" v="bar"/>
     <tag k="website" v="www.osm.org"/>
     <tag k="source:url" v="www.osm.org"/>
+    <tag k="wikidata" v="Q1234567"/>
   </node>
 </old>
 <new>
-  <node id="1501" visible="false" version="2" timestamp="2025-04-05T19:02:11Z" changeset="493" uid="47" user="thisIsASuperLongUserName"/>
+  <node id="1111111111" visible="false" version="2" timestamp="2025-04-05T19:02:11Z" changeset="493" uid="47" user="CleanerBot"/>
 </new>
 </action>
+
+<action type="delete">
+  <old>
+    <way id="1111111112" version="5" timestamp="2023-06-15T10:00:00Z" changeset="12345678" uid="555" user="LinearMapper">
+      <!-- The bounding box of the geometry -->
+      <bounds minlat="52.5162" minlon="13.3777" maxlat="52.5200" maxlon="13.3800"/>
+      
+      <!-- Start Coordinate -->
+      <nd ref="9876543210" lat="47.651" lon="9.471"/>
+      
+      <!-- End Coordinate -->
+      <nd ref="9876543211" lat="47.647" lon="9.473"/>
+      
+      <tag k="highway" v="footway"/>
+      <tag k="surface" v="asphalt"/>
+    </way>
+  </old>
+  <new>
+    <way id="1111111112" visible="false" version="6" timestamp="2025-01-08T18:45:00Z" changeset="493" uid="777" user="CleanerBot"/>
+  </new>
+</action>
+
 <action type="modify">
 <old>
   <way id="437103103" version="5" timestamp="2021-12-28T11:56:32Z" changeset="115467128" uid="15748" user="bigbug21">
