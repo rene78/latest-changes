@@ -782,14 +782,38 @@ function run() {
                         return linkify(escapeHtml(v));
                     }
 
-                    // 3. Skip Wiki linking for names, refs, phones, emails, addr:*, numeric values, etc.
+                    // 3. Wikidata id's
+                    // Matches any key containing 'wikidata' (e.g. 'wikidata', 'brand:wikidata', 'operator:wikidata')
+                    if (/wikidata/i.test(k)) {
+                        const url = `https://www.wikidata.org/wiki/${v}`;
+                        return `<a href="${url}" target="_blank" rel="noopener noreferrer">${v}</a>`;
+                    }
+
+                    // 4. Wikipedia links
+                    // Matches any key containing 'wikipedia' (e.g. 'wikipedia', 'brand:wikipedia')
+                    // Expected value format: "lang:Page Name" (e.g. "en:London" or "de:München")
+                    if (/wikipedia/i.test(k)) {
+                        // Split by the first colon to separate language code from page title
+                        const parts = v.split(':');
+                        if (parts.length >= 2) {
+                            const lang = parts[0];
+                            // Join the rest back together in case the title itself contains colons,
+                            // trim whitespace, and replace spaces with underscores for the URL.
+                            const page = parts.slice(1).join(':').trim().replace(/ /g, "_");
+                            // encodeURIComponent ensures special characters (like accents) are handled correctly
+                            const url = `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(page)}?uselang=en`;
+                            return `<a href="${url}" target="_blank" rel="noopener noreferrer">${v}</a>`;
+                        }
+                    }
+
+                    // 5. Skip Wiki linking for names, refs, phones, emails, addr:*, numeric values, etc.
                     const isNoWikiLink = /^(name|note|description|comment|source|ref|phone|mobile|website|email|addr:|tiger:|gnis:|created_by|fixme|todo|opening_hours|color|operator|contact:|start_date|brand|disused:|demolished:|branch|check_date)/i.test(k) || !isNaN(v.replace(",", "."));
 
                     if (isNoWikiLink) {
                         return v;
                     }
 
-                    // 4. Default: Wiki Link
+                    // 6. Default: OSM Wiki Link
                     const url = `https://wiki.openstreetmap.org/wiki/Tag:${encodeURIComponent(k)}=${encodeURIComponent(v)}`;
                     return `<a title="Go to OSM Wiki page of this tag" href="${url}" target="_blank" rel="noopener noreferrer">${v}</a>`;
                 };

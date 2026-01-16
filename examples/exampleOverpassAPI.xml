@@ -362,6 +362,9 @@
     <tag k="website" v="www.osm.org"/>
     <tag k="source:url" v="www.osm.org"/>
     <tag k="wikidata" v="Q1234567"/>
+    <tag k="brand:wikidata" v="Q1958759"/>
+    <tag k="brand:wikipedia" v="en:Müller (German trade company)"/>
+    <tag k="wikipedia" v="en:Beijing–Guangzhou high-speed railway"/>
   </node>
 </old>
 <new>
