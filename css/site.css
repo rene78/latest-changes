@@ -452,6 +452,7 @@ below the long text would expand the table width. */
 
 .changeset-discussion {
   font-weight: initial;
+  overflow-wrap: anywhere;
 }
 
 .comment-container {
@@ -472,9 +473,8 @@ below the long text would expand the table width. */
   display: flex;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 8px;
-  /* Space between buttons */
-  margin: 4px;
+  gap: 8px; /* Space between buttons */
+  margin: 8px 4px;
 }
 
 /* The button to highlight deleted elements itself */
