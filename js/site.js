@@ -282,8 +282,12 @@ function toggleWaitingScreen() {
 
 //On page load: Check if map is zoomed in enough. If yes: Download OSM changeset data from overpass
 //There are multiple public Overpass instances available. See https://wiki.openstreetmap.org/wiki/Overpass_API#Public_Overpass_API_instances
-// const overpassServer = '//overpass-api.de/api/';//Works very badly as of 2026-03-10, thus trying the maps.mail.ru instance below.
-const overpassServer = '//maps.mail.ru/osm/tools/overpass/api/';
+//Array of Overpass servers to try in order. If the first server fails, the fallback servers will be tried.
+const overpassServers = [
+    '//maps.mail.ru/osm/tools/overpass/api/', // Primary server (VK Maps)
+    '//overpass-api.de/api/', // Fallback server 1
+    '//overpass.private.coffee/api/' // Fallback server 2
+];
 const vandalismThreshold = -3; //If 3 more elements or tags have been deleted than added, the traffic light will change to red
 const debugMode = false; //False (default): Do an API call to Overpass. True: Use locally saved xml files for debugging/development purposes
 
@@ -331,21 +335,56 @@ function run() {
     const overpass_query = '[adiff:"' + calculateAnalysisStartTime().toISOString() + '"][bbox:' + bbox + '][out:xml];nw;out geom meta;';
     // console.log(overpass_server + 'interpreter?data=' + overpass_query);
 
-    //Either do an API call to Overpass or use a locally saved xml file for debugging purposes
-    let xmlDataLocation;
-    if (debugMode) xmlDataLocation = "./examples/exampleOverpassAPI.xml"; //Load example xml for debugging purposes. Works offline
-    else xmlDataLocation = overpassServer + 'interpreter?data=' + overpass_query; //API call to overpass
-
     let allOverpassXMLDataElements;
 
     // --- First API call: Fetch GeoJSON data with OSM tags from Overpass ---
-    fetch(xmlDataLocation, { signal: signal })//start fetch, return Promise. Pass signal for abort controlling.
-        .then(response => {
-            if (!response.ok) { // Check if the HTTP request was successful
-                throw new Error(`HTTP error fetching Overpass data! Status: ${response.status} ${response.statusText || ''}`);
-            }
-            return response.text(); // Get the response body as text (returns a Promise)
-        })
+    // Function to try fetching from each Overpass server in sequence (fallback mechanism). For debugging purposes a locally saved xml file can be loaded, if debugMode=true.
+    function fetchWithFallback(servers, query, signal) {
+        if (debugMode) {
+            //Load example xml for debugging purposes. Works offline
+            return fetch("./examples/exampleOverpassAPI.xml", { signal: signal })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    return response.text();
+                });
+        }
+
+        // Try each server in sequence until one succeeds
+        const tryServer = (index) => {
+            const server = servers[index];
+            const url = server + 'interpreter?data=' + query;
+            console.log(`Trying Overpass server ${index + 1}/${servers.length}: ${server}`);
+
+            return fetch(url, { signal: signal })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    console.log(`Successfully connected to Overpass server: ${server}`);
+                    return response.text();
+                })
+                .catch(error => {
+                    // If this is an abort error, re-throw it
+                    if (error.name === 'AbortError') {
+                        throw error;
+                    }
+                    // If there are more servers to try, try the next one
+                    if (index < servers.length - 1) {
+                        console.warn(`Failed to fetch from ${server}, trying next server...`, error.message);
+                        return tryServer(index + 1);
+                    }
+                    // No more servers to try, throw the error
+                    throw new Error(`All Overpass servers failed. Last error: ${error.message}`);
+                });
+        };
+
+        return tryServer(0);
+    }
+
+    // Use the fallback fetch function
+    fetchWithFallback(overpassServers, overpass_query, signal)
         .then(text => new window.DOMParser().parseFromString(text, "text/xml")) // Parse the text as XML
         .then(function (data) { // SUCCESS callback - 'data' is now the parsed XML Document
             // Check if aborted before processing (already done after fetch, but good to keep)
