@@ -285,8 +285,8 @@ function toggleWaitingScreen() {
 //Array of Overpass servers to try in order. If the first server fails, the fallback servers will be tried.
 const overpassServers = [
     '//maps.mail.ru/osm/tools/overpass/api/', // Primary server (VK Maps)
-    '//overpass-api.de/api/', // Fallback server 1
-    '//overpass.private.coffee/api/' // Fallback server 2
+    '//overpass-api.de/api/' // Fallback server 1
+    //'//overpass.private.coffee/api/' // Fallback server 2. Does not work at all. Only returns empty document after 1.1min. Thus commented out.
 ];
 const vandalismThreshold = -3; //If 3 more elements or tags have been deleted than added, the traffic light will change to red
 const debugMode = false; //False (default): Do an API call to Overpass. True: Use locally saved xml files for debugging/development purposes
