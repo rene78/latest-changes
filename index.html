@@ -44,7 +44,7 @@
   <!-- Style related -->
   <!-- <link rel="stylesheet" href="//unpkg.com/leaflet@1.7.1/dist/leaflet.css"> -->
   <link rel="stylesheet" href="./css/leaflet.css">
-  <link rel='stylesheet' type='text/css' href='css/site.css?v=20260818c' />
+  <link rel='stylesheet' type='text/css' href='css/site.css?v=20260818d' />
   <link rel="stylesheet" href="//unpkg.com/leaflet-gesture-handling/dist/leaflet-gesture-handling.min.css"
     type="text/css">
   <link rel="stylesheet"
@@ -74,7 +74,7 @@
   <script src='js/osmtogeojson.js' defer></script>
 
   <!-- Application script - MUST BE LAST since it depends on the others -->
-  <script src='js/site.js?v=20260818c' defer></script>
+  <script src='js/site.js?v=20260818d' defer></script>
 </head>
 
 <body>
@@ -97,28 +97,31 @@
             <div class="key-filter-caption">Select keys before download</div>
             <div class="key-filter" role="group" aria-label="Only download changes for these OSM keys">
               <input type="checkbox" id="filter-key-building" class="key-filter-checkbox" data-key="building">
-              <label for="filter-key-building" class="key-filter-chip key-building"
+              <label for="filter-key-building" class="key-filter-row key-building"
                 title="Only download changes that touch the building key">
                 <svg class="key-filter-icon" aria-hidden="true">
                   <use href="img/icons.svg#key-building"></use>
                 </svg>
-                <span>building</span>
+                <span class="key-filter-name">building</span>
+                <span class="key-switch" aria-hidden="true"><span class="key-switch-knob"></span></span>
               </label>
               <input type="checkbox" id="filter-key-highway" class="key-filter-checkbox" data-key="highway">
-              <label for="filter-key-highway" class="key-filter-chip key-highway"
+              <label for="filter-key-highway" class="key-filter-row key-highway"
                 title="Only download changes that touch the highway key">
                 <svg class="key-filter-icon" aria-hidden="true">
                   <use href="img/icons.svg#key-highway"></use>
                 </svg>
-                <span>highway</span>
+                <span class="key-filter-name">highway</span>
+                <span class="key-switch" aria-hidden="true"><span class="key-switch-knob"></span></span>
               </label>
               <input type="checkbox" id="filter-key-landuse" class="key-filter-checkbox" data-key="landuse">
-              <label for="filter-key-landuse" class="key-filter-chip key-landuse"
+              <label for="filter-key-landuse" class="key-filter-row key-landuse"
                 title="Only download changes that touch the landuse key">
                 <svg class="key-filter-icon" aria-hidden="true">
                   <use href="img/icons.svg#key-landuse"></use>
                 </svg>
-                <span>landuse</span>
+                <span class="key-filter-name">landuse</span>
+                <span class="key-switch" aria-hidden="true"><span class="key-switch-knob"></span></span>
               </label>
             </div>
           </div>

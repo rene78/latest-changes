@@ -368,7 +368,7 @@ function lockUnusedKeyFilters(downloadedKeys, downloading = false) {
 function unlockKeyFiltersForEditing() {
     const wrap = document.querySelector('.key-filter-wrap');
     wrap.classList.remove('is-locked', 'is-downloading');
-    document.querySelectorAll('.key-filter-chip').forEach(chip => chip.classList.remove('is-downloaded'));
+    document.querySelectorAll('.key-filter-row').forEach(row => row.classList.remove('is-downloaded'));
     OSM_KEY_FILTERS.forEach(key => {
         const chip = document.querySelector('label[for="filter-key-' + key + '"]');
         chip.title = 'Only download changes that touch the ' + key + ' key';

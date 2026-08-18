@@ -671,8 +671,8 @@ below the long text would expand the table width. */
 
 .key-filter {
   display: flex;
-  align-items: stretch;
-  gap: 6px;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .key-filter-checkbox {
@@ -683,25 +683,22 @@ below the long text would expand the table width. */
   pointer-events: none;
 }
 
-.key-filter-chip {
-  flex: 1 1 0;
-  display: inline-flex;
+.key-filter-row {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
+  gap: 8px;
   min-width: 0;
   height: 32px;
-  padding: 0 4px;
-  border: 1px solid #c5d0dc;
-  border-radius: 16px;
+  padding: 0 8px;
+  border: 1px solid #d5dbe3;
+  border-radius: 8px;
   background: #ffffff;
   color: #4a5563;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.01em;
   cursor: pointer;
   user-select: none;
-  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease;
 }
 
 .key-filter-icon {
@@ -710,27 +707,50 @@ below the long text would expand the table width. */
   flex: 0 0 14px;
 }
 
-.key-filter-chip:hover {
+.key-filter-name {
+  flex: 1 1 auto;
+}
+
+.key-switch {
+  position: relative;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  background: #c5cdd6;
+  transition: background-color 0.2s ease;
+}
+
+.key-switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform 0.2s ease;
+}
+
+.key-filter-row:hover {
   border-color: #008dff;
   color: #008dff;
 }
 
-.key-filter-wrap.is-locked .key-filter-chip:not(.is-downloaded) {
-  background: #eceff3;
-  border-color: #d5dbe3;
+.key-filter-wrap.is-locked .key-filter-row:not(.is-downloaded) {
+  background: #f3f5f7;
+  border-color: #e1e6ec;
   color: #9aa3ad;
-  box-shadow: none;
-  filter: grayscale(1);
-  opacity: 0.45;
-  cursor: pointer;
+  opacity: 0.55;
 }
 
-.key-filter-wrap.is-locked .key-filter-chip:not(.is-downloaded):hover {
-  border-color: #d5dbe3;
+.key-filter-wrap.is-locked .key-filter-row:not(.is-downloaded):hover {
+  border-color: #e1e6ec;
   color: #9aa3ad;
 }
 
-.key-filter-wrap.is-downloading .key-filter-chip {
+.key-filter-wrap.is-downloading .key-filter-row {
   pointer-events: none;
   cursor: wait;
 }
@@ -742,25 +762,22 @@ below the long text would expand the table width. */
   outline-offset: 2px;
 }
 
-#filter-key-building:checked + .key-building {
-  background-color: #c47d3b;
-  border-color: #c47d3b;
-  color: #fff;
-  box-shadow: 0 2px 6px rgba(196, 125, 59, 0.35);
+#filter-key-building:checked + .key-building .key-switch {
+  background: #c47d3b;
 }
 
-#filter-key-highway:checked + .key-highway {
-  background-color: #c84b4b;
-  border-color: #c84b4b;
-  color: #fff;
-  box-shadow: 0 2px 6px rgba(200, 75, 75, 0.35);
+#filter-key-highway:checked + .key-highway .key-switch {
+  background: #c84b4b;
 }
 
-#filter-key-landuse:checked + .key-landuse {
-  background-color: #5a9a3a;
-  border-color: #5a9a3a;
-  color: #fff;
-  box-shadow: 0 2px 6px rgba(90, 154, 58, 0.35);
+#filter-key-landuse:checked + .key-landuse .key-switch {
+  background: #5a9a3a;
+}
+
+#filter-key-building:checked + .key-building .key-switch-knob,
+#filter-key-highway:checked + .key-highway .key-switch-knob,
+#filter-key-landuse:checked + .key-landuse .key-switch-knob {
+  transform: translateX(16px);
 }
 
 /* #endregion */
