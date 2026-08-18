@@ -292,6 +292,10 @@ const vandalismThreshold = -3; //If 3 more elements or tags have been deleted th
 const debugMode = false; //False (default): Do an API call to Overpass. True: Use locally saved xml files for debugging/development purposes
 const OSM_KEY_FILTERS = ['building', 'highway', 'landuse'];
 
+function getAllKeysCheckbox() {
+    return document.getElementById('filter-key-all');
+}
+
 function getSelectedOsmKeys() {
     return OSM_KEY_FILTERS.filter(key => {
         const checkbox = document.getElementById('filter-key-' + key);
@@ -299,15 +303,40 @@ function getSelectedOsmKeys() {
     });
 }
 
+function isAllKeysMode() {
+    const allBox = getAllKeysCheckbox();
+    return !getSelectedOsmKeys().length && (!allBox || allBox.checked);
+}
+
+function setKeyCheckbox(key, checked) {
+    const checkbox = document.getElementById('filter-key-' + key);
+    if (checkbox) checkbox.checked = checked;
+}
+
+function applyExclusiveKeySelection(changedKey) {
+    if (changedKey === 'all') {
+        if (getAllKeysCheckbox().checked) {
+            OSM_KEY_FILTERS.forEach(key => setKeyCheckbox(key, false));
+        } else if (!getSelectedOsmKeys().length) {
+            // Keep at least one mode selected: fall back to all
+            getAllKeysCheckbox().checked = true;
+        }
+    } else if (getSelectedOsmKeys().length) {
+        getAllKeysCheckbox().checked = false;
+    } else {
+        getAllKeysCheckbox().checked = true;
+    }
+}
+
 function keysFromUrl() {
     const raw = new URLSearchParams(location.search).get('keys') || '';
-    return raw.split(',').map(key => key.trim()).filter(key => OSM_KEY_FILTERS.includes(key));
+    return raw.split(',').map(key => key.trim()).filter(key => key === 'all' || OSM_KEY_FILTERS.includes(key));
 }
 
 function syncOsmKeysInUrl(keys) {
     const url = new URL(location.href);
-    if (keys.length) url.searchParams.set('keys', keys.join(','));
-    else url.searchParams.delete('keys');
+    const value = (!keys.length || keys[0] === 'all') ? 'all' : keys.join(',');
+    url.searchParams.set('keys', value);
     history.replaceState(history.state, '', url);
 }
 
@@ -317,7 +346,7 @@ function setKeyFilterCaption(text) {
 }
 
 function persistOsmKeyFilters() {
-    const keys = getSelectedOsmKeys();
+    const keys = isAllKeysMode() ? ['all'] : getSelectedOsmKeys();
     localStorage.setItem('osm-key-filters', JSON.stringify(keys));
     syncOsmKeysInUrl(keys);
 }
@@ -330,48 +359,49 @@ function restoreOsmKeyFilters() {
             try {
                 const parsed = JSON.parse(stored);
                 if (Array.isArray(parsed)) {
-                    keys = parsed.filter(key => OSM_KEY_FILTERS.includes(key));
+                    keys = parsed.filter(key => key === 'all' || OSM_KEY_FILTERS.includes(key));
                 }
             } catch (e) {
                 // Ignore invalid localStorage content
             }
         }
     }
-    OSM_KEY_FILTERS.forEach(key => {
-        const checkbox = document.getElementById('filter-key-' + key);
-        if (checkbox) checkbox.checked = keys.includes(key);
-    });
+    const useAll = !keys.length || keys.includes('all');
+    getAllKeysCheckbox().checked = useAll;
+    OSM_KEY_FILTERS.forEach(key => setKeyCheckbox(key, !useAll && keys.includes(key)));
     persistOsmKeyFilters();
 }
 
 function lockUnusedKeyFilters(downloadedKeys, downloading = false) {
     const wrap = document.querySelector('.key-filter-wrap');
+    const downloadedAll = downloadedKeys.length === 0;
     wrap.classList.toggle('is-downloading', downloading);
-    wrap.classList.toggle('is-locked', downloadedKeys.length > 0);
+    wrap.classList.add('is-locked');
+    const allRow = document.querySelector('label[for="filter-key-all"]');
+    allRow.classList.toggle('is-downloaded', downloadedAll);
+    allRow.title = downloadedAll
+        ? 'Included in this download'
+        : 'Not downloaded. Click to download all keys next';
     OSM_KEY_FILTERS.forEach(key => {
-        const chip = document.querySelector('label[for="filter-key-' + key + '"]');
+        const row = document.querySelector('label[for="filter-key-' + key + '"]');
         const used = downloadedKeys.includes(key);
-        chip.classList.toggle('is-downloaded', used);
-        chip.title = used
+        row.classList.toggle('is-downloaded', used);
+        row.title = used
             ? 'Included in this download'
-            : downloadedKeys.length
-                ? 'Not downloaded. Click to include in the next download'
-                : 'Only download changes that touch the ' + key + ' key';
+            : 'Not downloaded. Click to include in the next download';
     });
-    if (downloadedKeys.length) {
-        setKeyFilterCaption('Downloaded: ' + downloadedKeys.join(', '));
-    } else {
-        setKeyFilterCaption('Select keys before download');
-    }
+    setKeyFilterCaption(downloadedAll ? 'Downloaded: all' : 'Downloaded: ' + downloadedKeys.join(', '));
 }
 
 function unlockKeyFiltersForEditing() {
     const wrap = document.querySelector('.key-filter-wrap');
     wrap.classList.remove('is-locked', 'is-downloading');
     document.querySelectorAll('.key-filter-row').forEach(row => row.classList.remove('is-downloaded'));
+    getAllKeysCheckbox().title = 'Download all changes, without filtering by OSM key';
+    document.querySelector('label[for="filter-key-all"]').title = 'Download all changes, without filtering by OSM key';
     OSM_KEY_FILTERS.forEach(key => {
-        const chip = document.querySelector('label[for="filter-key-' + key + '"]');
-        chip.title = 'Only download changes that touch the ' + key + ' key';
+        const row = document.querySelector('label[for="filter-key-' + key + '"]');
+        row.title = 'Only download changes that touch the ' + key + ' key';
     });
     setKeyFilterCaption('Select keys before download');
 }
@@ -2141,7 +2171,10 @@ document.querySelectorAll(".key-filter-checkbox").forEach(checkbox => {
             setKeyFilterCaption('Click Get Changesets to apply');
         }
     });
-    checkbox.addEventListener("change", persistOsmKeyFilters);
+    checkbox.addEventListener("change", () => {
+        applyExclusiveKeySelection(checkbox.dataset.key);
+        persistOsmKeyFilters();
+    });
 });
 
 //Display "Back-to-top" button if changesets in sidebar are overflowing and user scrolled down a bit

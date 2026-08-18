@@ -44,7 +44,7 @@
   <!-- Style related -->
   <!-- <link rel="stylesheet" href="//unpkg.com/leaflet@1.7.1/dist/leaflet.css"> -->
   <link rel="stylesheet" href="./css/leaflet.css">
-  <link rel='stylesheet' type='text/css' href='css/site.css?v=20260818d' />
+  <link rel='stylesheet' type='text/css' href='css/site.css?v=20260818e' />
   <link rel="stylesheet" href="//unpkg.com/leaflet-gesture-handling/dist/leaflet-gesture-handling.min.css"
     type="text/css">
   <link rel="stylesheet"
@@ -74,7 +74,7 @@
   <script src='js/osmtogeojson.js' defer></script>
 
   <!-- Application script - MUST BE LAST since it depends on the others -->
-  <script src='js/site.js?v=20260818d' defer></script>
+  <script src='js/site.js?v=20260818e' defer></script>
 </head>
 
 <body>
@@ -96,6 +96,15 @@
           <div class="key-filter-wrap">
             <div class="key-filter-caption">Select keys before download</div>
             <div class="key-filter" role="group" aria-label="Only download changes for these OSM keys">
+              <input type="checkbox" id="filter-key-all" class="key-filter-checkbox" data-key="all" checked>
+              <label for="filter-key-all" class="key-filter-row key-all"
+                title="Download all changes, without filtering by OSM key">
+                <svg class="key-filter-icon" aria-hidden="true">
+                  <use href="img/icons.svg#key-all"></use>
+                </svg>
+                <span class="key-filter-name">all</span>
+                <span class="key-switch" aria-hidden="true"><span class="key-switch-knob"></span></span>
+              </label>
               <input type="checkbox" id="filter-key-building" class="key-filter-checkbox" data-key="building">
               <label for="filter-key-building" class="key-filter-row key-building"
                 title="Only download changes that touch the building key">

@@ -755,11 +755,16 @@ below the long text would expand the table width. */
   cursor: wait;
 }
 
+#filter-key-all:focus-visible + .key-all,
 #filter-key-building:focus-visible + .key-building,
 #filter-key-highway:focus-visible + .key-highway,
 #filter-key-landuse:focus-visible + .key-landuse {
   outline: 2px solid #008dff;
   outline-offset: 2px;
+}
+
+#filter-key-all:checked + .key-all .key-switch {
+  background: #008dff;
 }
 
 #filter-key-building:checked + .key-building .key-switch {
@@ -774,6 +779,7 @@ below the long text would expand the table width. */
   background: #5a9a3a;
 }
 
+#filter-key-all:checked + .key-all .key-switch-knob,
 #filter-key-building:checked + .key-building .key-switch-knob,
 #filter-key-highway:checked + .key-highway .key-switch-knob,
 #filter-key-landuse:checked + .key-landuse .key-switch-knob {
