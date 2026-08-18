@@ -290,6 +290,44 @@ const overpassServers = [
 ];
 const vandalismThreshold = -3; //If 3 more elements or tags have been deleted than added, the traffic light will change to red
 const debugMode = false; //False (default): Do an API call to Overpass. True: Use locally saved xml files for debugging/development purposes
+const OSM_KEY_FILTERS = ['building', 'highway', 'landuse'];
+
+function getSelectedOsmKeys() {
+    return OSM_KEY_FILTERS.filter(key => {
+        const checkbox = document.getElementById('filter-key-' + key);
+        return checkbox && checkbox.checked;
+    });
+}
+
+function persistOsmKeyFilters() {
+    localStorage.setItem('osm-key-filters', JSON.stringify(getSelectedOsmKeys()));
+}
+
+function restoreOsmKeyFilters() {
+    const stored = localStorage.getItem('osm-key-filters');
+    if (!stored) return;
+    try {
+        const keys = JSON.parse(stored);
+        if (!Array.isArray(keys)) return;
+        OSM_KEY_FILTERS.forEach(key => {
+            const checkbox = document.getElementById('filter-key-' + key);
+            if (checkbox) checkbox.checked = keys.includes(key);
+        });
+    } catch (e) {
+        // Ignore invalid localStorage content
+    }
+}
+
+// Build the Overpass adiff query. Selected keys are applied server-side so unused objects are never downloaded.
+function buildOverpassQuery(bbox) {
+    const header = '[adiff:"' + calculateAnalysisStartTime().toISOString() + '"][bbox:' + bbox + '][out:xml];';
+    const keys = getSelectedOsmKeys();
+    if (!keys.length) {
+        return header + 'nw;out geom meta;';
+    }
+    const union = keys.map(key => 'nw["' + key + '"];').join('');
+    return header + '(' + union + ');out geom meta;';
+}
 
 // Reset AbortController to null during load of script. Needed to reset all Promise requests.
 window.currentAbortController = null;
@@ -298,6 +336,7 @@ window.currentAbortController = null;
 let changesets = {};
 
 //Check if map is zoomed in enough (only executed on initial page load)
+restoreOsmKeyFilters();
 const isMapZoomedInEnough = updateMap();
 if (isMapZoomedInEnough) run();
 
@@ -332,7 +371,7 @@ function run() {
         bounds.getNorthEast().lat + ',' +
         bounds.getNorthEast().wrap().lng;
     // const overpass_query = '[adiff:"' + calculateAnalysisStartTime() + '"][bbox:' + bbox + '][out:xml][timeout:22];way->.ways;(.ways>;node;);out meta;.ways out geom meta;';//This query sometimes only returned nodes. Thus replaced with query below
-    const overpass_query = '[adiff:"' + calculateAnalysisStartTime().toISOString() + '"][bbox:' + bbox + '][out:xml];nw;out geom meta;';
+    const overpass_query = buildOverpassQuery(bbox);
     // console.log(overpass_server + 'interpreter?data=' + overpass_query);
 
     let allOverpassXMLDataElements;
@@ -626,8 +665,6 @@ function run() {
             //Reset display of "filter-red-checkbox" (in case it has been checked on a previous download)
             document.querySelector(".traffic-light-filter").classList.add("filter-red-color");
             document.querySelector("#filter-red-checkbox").checked = false;
-            //Reset OSM key filters (in case they have been checked on a previous download)
-            resetOsmKeyFilters();
 
             //Compare length and position of hovered and twin element.
             //return true: Geometry has been changed
@@ -1820,46 +1857,10 @@ function highlightSearchTermInText(text, searchTerm) {
     return { highlightedText, matchFound };
 }
 
-const OSM_KEY_FILTERS = ['building', 'highway', 'landuse'];
-
 // OSM tags live on feature.properties.tags (osmtogeojson default)
 function getFeatureTags(feature) {
     if (!feature || !feature.properties) return {};
     return feature.properties.tags || {};
-}
-
-function featureHasAnyOsmKey(feature, keys) {
-    if (!keys.length) return true;
-    const tags = getFeatureTags(feature);
-    return keys.some(key => Object.prototype.hasOwnProperty.call(tags, key));
-}
-
-function getSelectedOsmKeys() {
-    return OSM_KEY_FILTERS.filter(key => {
-        const checkbox = document.getElementById('filter-key-' + key);
-        return checkbox && checkbox.checked;
-    });
-}
-
-function resetOsmKeyFilters() {
-    OSM_KEY_FILTERS.forEach(key => {
-        const checkbox = document.getElementById('filter-key-' + key);
-        if (checkbox) checkbox.checked = false;
-    });
-}
-
-function changesetTouchesOsmKeys(changesetData, keys) {
-    if (!keys.length) return true;
-    if (changesetData.osmKeys instanceof Set) {
-        return keys.some(key => changesetData.osmKeys.has(key));
-    }
-    let found = false;
-    if (changesetData.leafletFeatureGroup) {
-        changesetData.leafletFeatureGroup.eachLayer(layer => {
-            if (!found && featureHasAnyOsmKey(layer.feature, keys)) found = true;
-        });
-    }
-    return found;
 }
 
 //Filter changesets and update changesets list and GeoJSON data on map
@@ -1867,10 +1868,9 @@ function filterChangesets() {
     let foundChangesets = {}; // This will store data for rendering (potentially with highlighted text)
     const searchTerm = document.querySelector(".search-changesets-field").value.toLowerCase();
     const onlyRed = document.querySelector("#filter-red-checkbox").checked;
-    const selectedKeys = getSelectedOsmKeys();
 
-    // If searchTerm is empty AND "onlyRed" is not checked AND no OSM key is selected, show all changesets
-    if (!searchTerm && !onlyRed && selectedKeys.length === 0) {
+    // If searchTerm is empty AND "onlyRed" is not checked, show all changesets by writing all the data from 'changesets' object into 'foundChangesets'
+    if (!searchTerm && !onlyRed) {
         for (const changesetId in changesets) {
             // Ensure we are only processing actual changeset entries, not 'allLeafletLayers'
             if (changesets.hasOwnProperty(changesetId) && changesetId !== 'allLeafletLayers') {
@@ -1889,9 +1889,6 @@ function filterChangesets() {
 
         // Apply "onlyRed" filter first. If it's active and current changeset is not marked as 'possible vandalism', skip.
         if (onlyRed && !currentChangesetData.possibleVandalism) continue;
-
-        // Apply OSM key filter. Keep the changeset if it touches at least one selected key (OR logic).
-        if (!changesetTouchesOsmKeys(currentChangesetData, selectedKeys)) continue;
 
         let matchFoundBySearchTerm = false;
         let modifiedComment = currentChangesetData.comment || ""; // Start with original or empty string
@@ -1914,9 +1911,9 @@ function filterChangesets() {
         }
 
         // Determine if this changeset should be included in results:
-        // - If searchTerm is entered, a comment/user match is required.
-        // - If searchTerm is NOT entered, the red-light and/or OSM key filters already applied above are enough.
-        if ((searchTerm && matchFoundBySearchTerm) || !searchTerm) {
+        // - If searchTerm is entered AND matchFoundBySearchTerm must be true.
+        // - If searchTerm is NOT entered BUT onlyRed IS (due to initial check)
+        if ((searchTerm && matchFoundBySearchTerm) || (!searchTerm && onlyRed)) {
             foundChangesets[changesetId] = {
                 ...currentChangesetData, // Copy all original properties
                 user: modifiedUserName,    // Override with (potentially) highlighted user
@@ -1926,12 +1923,11 @@ function filterChangesets() {
     }
     // console.table(foundChangesets);
     renderChangesetsList(foundChangesets); // Pass the object with potentially highlighted text
-    displayGeoJson(foundChangesets, selectedKeys);
+    displayGeoJson(foundChangesets);
 
     //Filter GeoJSON on map
-    function displayGeoJson(fSets, keysToShow) { // fSets is the foundChangesets object
+    function displayGeoJson(fSets) { // fSets is the foundChangesets object
         if (!changesets.allLeafletLayers) return;
-        const visibleKeys = keysToShow || [];
 
         // Clear layers. Important: The layers are just detached from the map. The reference to those layers
         // inside 'changesets[csId].leafletFeatureGroup' is still intact.
@@ -1945,9 +1941,7 @@ function filterChangesets() {
                 const originalChangesetData = changesets[csId];
                 if (originalChangesetData && originalChangesetData.leafletFeatureGroup) {
                     originalChangesetData.leafletFeatureGroup.eachLayer(layer => {
-                        if (featureHasAnyOsmKey(layer.feature, visibleKeys)) {
-                            visibleLayers.push(layer);
-                        }
+                        visibleLayers.push(layer);
                     });
                 }
             }
@@ -2075,9 +2069,9 @@ document.querySelector("#filter-red-checkbox").addEventListener("click", (e) => 
     filterChangesets();
 });
 
-// Filter changesets and map features by OSM key (building, highway, landuse)
+// OSM key chips are query parameters: persist them and apply on the next download
 document.querySelectorAll(".key-filter-checkbox").forEach(checkbox => {
-    checkbox.addEventListener("change", filterChangesets);
+    checkbox.addEventListener("change", persistOsmKeyFilters);
 });
 
 //Display "Back-to-top" button if changesets in sidebar are overflowing and user scrolled down a bit

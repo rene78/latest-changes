@@ -93,6 +93,35 @@
             <option value="7" selected>Last 7 Days</option>
             <option value="30">Last 30 Days</option>
           </select>
+          <div class="key-filter-wrap">
+            <div class="key-filter-caption">Only download these keys</div>
+            <div class="key-filter" role="group" aria-label="Only download changes for these OSM keys">
+              <input type="checkbox" id="filter-key-building" class="key-filter-checkbox" data-key="building">
+              <label for="filter-key-building" class="key-filter-chip key-building"
+                title="Only download changes that touch the building key">
+                <svg class="key-filter-icon" aria-hidden="true">
+                  <use href="img/icons.svg#key-building"></use>
+                </svg>
+                <span>building</span>
+              </label>
+              <input type="checkbox" id="filter-key-highway" class="key-filter-checkbox" data-key="highway">
+              <label for="filter-key-highway" class="key-filter-chip key-highway"
+                title="Only download changes that touch the highway key">
+                <svg class="key-filter-icon" aria-hidden="true">
+                  <use href="img/icons.svg#key-highway"></use>
+                </svg>
+                <span>highway</span>
+              </label>
+              <input type="checkbox" id="filter-key-landuse" class="key-filter-checkbox" data-key="landuse">
+              <label for="filter-key-landuse" class="key-filter-chip key-landuse"
+                title="Only download changes that touch the landuse key">
+                <svg class="key-filter-icon" aria-hidden="true">
+                  <use href="img/icons.svg#key-landuse"></use>
+                </svg>
+                <span>landuse</span>
+              </label>
+            </div>
+          </div>
           <button id="download-changesets-button" title="Get recent changesets in this region">
             <svg class="circular-arrow">
               <use href="img/icons.svg#circular-arrow"></use>
@@ -116,32 +145,6 @@
                 </svg>
               </div>
               <input type="text" class="search-changesets-field" placeholder="Filter changesets">
-            </div>
-            <div class="key-filter" role="group" aria-label="Filter by OSM key">
-              <input type="checkbox" id="filter-key-building" class="key-filter-checkbox" data-key="building">
-              <label for="filter-key-building" class="key-filter-chip key-building"
-                title="Only show changes that touch the building key">
-                <svg class="key-filter-icon" aria-hidden="true">
-                  <use href="img/icons.svg#key-building"></use>
-                </svg>
-                <span>building</span>
-              </label>
-              <input type="checkbox" id="filter-key-highway" class="key-filter-checkbox" data-key="highway">
-              <label for="filter-key-highway" class="key-filter-chip key-highway"
-                title="Only show changes that touch the highway key">
-                <svg class="key-filter-icon" aria-hidden="true">
-                  <use href="img/icons.svg#key-highway"></use>
-                </svg>
-                <span>highway</span>
-              </label>
-              <input type="checkbox" id="filter-key-landuse" class="key-filter-checkbox" data-key="landuse">
-              <label for="filter-key-landuse" class="key-filter-chip key-landuse"
-                title="Only show changes that touch the landuse key">
-                <svg class="key-filter-icon" aria-hidden="true">
-                  <use href="img/icons.svg#key-landuse"></use>
-                </svg>
-                <span>landuse</span>
-              </label>
             </div>
           </div>
         </div>
