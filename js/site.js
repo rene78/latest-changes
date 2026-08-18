@@ -299,23 +299,81 @@ function getSelectedOsmKeys() {
     });
 }
 
+function keysFromUrl() {
+    const raw = new URLSearchParams(location.search).get('keys') || '';
+    return raw.split(',').map(key => key.trim()).filter(key => OSM_KEY_FILTERS.includes(key));
+}
+
+function syncOsmKeysInUrl(keys) {
+    const url = new URL(location.href);
+    if (keys.length) url.searchParams.set('keys', keys.join(','));
+    else url.searchParams.delete('keys');
+    history.replaceState(history.state, '', url);
+}
+
+function setKeyFilterCaption(text) {
+    const caption = document.querySelector('.key-filter-caption');
+    if (caption) caption.textContent = text;
+}
+
 function persistOsmKeyFilters() {
-    localStorage.setItem('osm-key-filters', JSON.stringify(getSelectedOsmKeys()));
+    const keys = getSelectedOsmKeys();
+    localStorage.setItem('osm-key-filters', JSON.stringify(keys));
+    syncOsmKeysInUrl(keys);
 }
 
 function restoreOsmKeyFilters() {
-    const stored = localStorage.getItem('osm-key-filters');
-    if (!stored) return;
-    try {
-        const keys = JSON.parse(stored);
-        if (!Array.isArray(keys)) return;
-        OSM_KEY_FILTERS.forEach(key => {
-            const checkbox = document.getElementById('filter-key-' + key);
-            if (checkbox) checkbox.checked = keys.includes(key);
-        });
-    } catch (e) {
-        // Ignore invalid localStorage content
+    let keys = keysFromUrl();
+    if (!keys.length) {
+        const stored = localStorage.getItem('osm-key-filters');
+        if (stored) {
+            try {
+                const parsed = JSON.parse(stored);
+                if (Array.isArray(parsed)) {
+                    keys = parsed.filter(key => OSM_KEY_FILTERS.includes(key));
+                }
+            } catch (e) {
+                // Ignore invalid localStorage content
+            }
+        }
     }
+    OSM_KEY_FILTERS.forEach(key => {
+        const checkbox = document.getElementById('filter-key-' + key);
+        if (checkbox) checkbox.checked = keys.includes(key);
+    });
+    persistOsmKeyFilters();
+}
+
+function lockUnusedKeyFilters(downloadedKeys, downloading = false) {
+    const wrap = document.querySelector('.key-filter-wrap');
+    wrap.classList.toggle('is-downloading', downloading);
+    wrap.classList.toggle('is-locked', downloadedKeys.length > 0);
+    OSM_KEY_FILTERS.forEach(key => {
+        const chip = document.querySelector('label[for="filter-key-' + key + '"]');
+        const used = downloadedKeys.includes(key);
+        chip.classList.toggle('is-downloaded', used);
+        chip.title = used
+            ? 'Included in this download'
+            : downloadedKeys.length
+                ? 'Not downloaded. Click to include in the next download'
+                : 'Only download changes that touch the ' + key + ' key';
+    });
+    if (downloadedKeys.length) {
+        setKeyFilterCaption('Downloaded: ' + downloadedKeys.join(', '));
+    } else {
+        setKeyFilterCaption('Select keys before download');
+    }
+}
+
+function unlockKeyFiltersForEditing() {
+    const wrap = document.querySelector('.key-filter-wrap');
+    wrap.classList.remove('is-locked', 'is-downloading');
+    document.querySelectorAll('.key-filter-chip').forEach(chip => chip.classList.remove('is-downloaded'));
+    OSM_KEY_FILTERS.forEach(key => {
+        const chip = document.querySelector('label[for="filter-key-' + key + '"]');
+        chip.title = 'Only download changes that touch the ' + key + ' key';
+    });
+    setKeyFilterCaption('Select keys before download');
 }
 
 // Build the Overpass adiff query. Selected keys are applied server-side so unused objects are never downloaded.
@@ -347,6 +405,9 @@ function run() {
     document.querySelector("#results").innerHTML = "";//Empty old results list (same happens in renderChangeSetsList() later on when filtering)
 
     toggleWaitingScreen();//Show loading animation and make download button unavailable
+    const requestedKeys = getSelectedOsmKeys();
+    persistOsmKeyFilters();
+    lockUnusedKeyFilters(requestedKeys, true);
 
     // 1. Abort previous request if it exists
     if (window.currentAbortController) {
@@ -393,7 +454,7 @@ function run() {
         // Try each server in sequence until one succeeds
         const tryServer = (index) => {
             const server = servers[index];
-            const url = server + 'interpreter?data=' + query;
+            const url = server + 'interpreter?data=' + encodeURIComponent(query);
             console.log(`Trying Overpass server ${index + 1}/${servers.length}: ${server}`);
 
             return fetch(url, { signal: signal })
@@ -656,6 +717,7 @@ function run() {
             //Change app display from "loading" to "ready"
             d3.select('#map').classed('faded', false);
             toggleWaitingScreen();
+            lockUnusedKeyFilters(requestedKeys, false);
 
             //Display filter changesets toolbar
             document.querySelector(".filter-container").classList.remove("hide");
@@ -1286,6 +1348,7 @@ function run() {
             } else {
                 // Handle actual network or processing errors
                 toggleWaitingScreen(); // Ensure loading screen is off
+                unlockKeyFiltersForEditing();
                 console.error("Error fetching or processing data:", error); // Log the actual error
                 message("alarm", "Server error: " + (error.message || "Could not load data."));
             }
@@ -2069,8 +2132,15 @@ document.querySelector("#filter-red-checkbox").addEventListener("click", (e) => 
     filterChangesets();
 });
 
-// OSM key chips are query parameters: persist them and apply on the next download
+// OSM key chips are query parameters: persist them in the URL and apply on the next download
 document.querySelectorAll(".key-filter-checkbox").forEach(checkbox => {
+    checkbox.addEventListener("click", () => {
+        const wrap = document.querySelector('.key-filter-wrap');
+        if (wrap.classList.contains('is-locked')) {
+            unlockKeyFiltersForEditing();
+            setKeyFilterCaption('Click Get Changesets to apply');
+        }
+    });
     checkbox.addEventListener("change", persistOsmKeyFilters);
 });
 

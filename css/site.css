@@ -715,6 +715,26 @@ below the long text would expand the table width. */
   color: #008dff;
 }
 
+.key-filter-wrap.is-locked .key-filter-chip:not(.is-downloaded) {
+  background: #eceff3;
+  border-color: #d5dbe3;
+  color: #9aa3ad;
+  box-shadow: none;
+  filter: grayscale(1);
+  opacity: 0.45;
+  cursor: pointer;
+}
+
+.key-filter-wrap.is-locked .key-filter-chip:not(.is-downloaded):hover {
+  border-color: #d5dbe3;
+  color: #9aa3ad;
+}
+
+.key-filter-wrap.is-downloading .key-filter-chip {
+  pointer-events: none;
+  cursor: wait;
+}
+
 #filter-key-building:focus-visible + .key-building,
 #filter-key-highway:focus-visible + .key-highway,
 #filter-key-landuse:focus-visible + .key-landuse {
