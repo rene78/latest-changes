@@ -29,4 +29,19 @@ d="m280,278a153,153 0 1,0-2,2l170,170m-91-117 110,110-26,26-110-110"/>
 <!-- Arrow up -->
 <symbol id="arrow-up" class="random" focusable="false" width="24" height="24" viewBox="0 0 24 24"><path d="M12 16.41l-6.71-6.7 1.42-1.42 5.29 5.3 5.29-5.3 1.42 1.42z"></path></symbol>
 
+<!-- OSM key: building -->
+<symbol id="key-building" viewBox="0 0 24 24">
+  <path fill="currentColor" d="M4 21V9.5L12 3l8 6.5V21h-6v-6H10v6H4zm2-2h2v-6h8v6h2v-8.4l-6-4.9-6 4.9V19z"/>
+</symbol>
+
+<!-- OSM key: highway -->
+<symbol id="key-highway" viewBox="0 0 24 24">
+  <path fill="currentColor" d="M5 3h14l-2.2 18H7.2L5 3zm3.1 2-.3 2.4h8.4L16 5H8.1zm-.5 4.4-.3 2.4h9.4l-.3-2.4H7.6zm.6 8.4.3-2.4H15.5l.3 2.4H8.2z"/>
+</symbol>
+
+<!-- OSM key: landuse -->
+<symbol id="key-landuse" viewBox="0 0 24 24">
+  <path fill="currentColor" d="M12 3.5 7 11h10L12 3.5zM4 20h7v-6.5L4 20zm9 0h7l-7-6.5V20z"/>
+</symbol>
+
 </svg>

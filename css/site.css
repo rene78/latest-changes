@@ -655,6 +655,81 @@ below the long text would expand the table width. */
   background-color: #008dff;
 }
 
+.key-filter {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.key-filter-checkbox {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.key-filter-chip {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  height: 32px;
+  padding: 0 4px;
+  border: 1px solid #c5d0dc;
+  border-radius: 16px;
+  background: #ffffff;
+  color: #4a5563;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.key-filter-icon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+}
+
+.key-filter-chip:hover {
+  border-color: #008dff;
+  color: #008dff;
+}
+
+#filter-key-building:focus-visible + .key-building,
+#filter-key-highway:focus-visible + .key-highway,
+#filter-key-landuse:focus-visible + .key-landuse {
+  outline: 2px solid #008dff;
+  outline-offset: 2px;
+}
+
+#filter-key-building:checked + .key-building {
+  background-color: #c47d3b;
+  border-color: #c47d3b;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(196, 125, 59, 0.35);
+}
+
+#filter-key-highway:checked + .key-highway {
+  background-color: #c84b4b;
+  border-color: #c84b4b;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(200, 75, 75, 0.35);
+}
+
+#filter-key-landuse:checked + .key-landuse {
+  background-color: #5a9a3a;
+  border-color: #5a9a3a;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(90, 154, 58, 0.35);
+}
+
 /* #endregion */
 
 /* #region CSS RELATED TO LEAFLET MAP LAYOUT */
