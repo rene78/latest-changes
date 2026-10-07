@@ -698,7 +698,7 @@ below the long text would expand the table width. */
 
 #loading-animation {
   position: absolute;
-  left: calc(50% - 25px);
+  left: calc(50% - 40px);
   top: 40%;
   border: 16px solid white;
   border-radius: 50%;
@@ -712,9 +712,34 @@ below the long text would expand the table width. */
   pointer-events: none;
 }
 
+/* Text shown below the loading spinner (e.g. which Overpass server is currently tried) */
+#loading-animation-text {
+  position: absolute;
+  left: 0;
+  right: 0;
+  /* Spinner: top 40% + height 50px + borders 16px*2 + 10px gap */
+  top: calc(40% + 92px);
+  /* Shrink-to-fit: background only as wide as the text, centered via auto margins */
+  width: -webkit-fit-content;
+  width: fit-content;
+  margin: 0 auto;
+  box-sizing: border-box;
+  padding: 5px 12px;
+  color: white;
+  background-color: rgba(100, 100, 100, .5);
+  border-radius: 5px;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  z-index: 444;
+}
+
 @media (max-width: 600px) {
   #loading-animation {
     top: 0%;
+  }
+
+  #loading-animation-text {
+    top: 92px;
   }
 }
 

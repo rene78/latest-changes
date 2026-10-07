@@ -272,10 +272,15 @@ function defineColor(date) {
 //Toggle display of loading animation and appearance of download button
 function toggleWaitingScreen() {
     const loadingAnimation = document.querySelector("#loading-animation");
+    const loadingAnimationText = document.querySelector("#loading-animation-text");
     const button = document.getElementById('download-changesets-button');
     const buttonText = document.getElementById('download-changesets-button-text');
 
     loadingAnimation.classList.toggle("hide");//display loading spinner
+    loadingAnimationText.classList.toggle("hide");//display text below spinner
+    if (loadingAnimationText.classList.contains("hide")) {
+        loadingAnimationText.innerText = "";//Clear text below spinner when it is hidden
+    }
     buttonText.innerText = (buttonText.innerText == "Get Changesets") ? "Loading..." : "Get Changesets";//Toggle button text
     button.disabled = (button.disabled) ? button.disabled = "" : button.disabled = "disabled";//Toggle button disable
 }
@@ -284,8 +289,8 @@ function toggleWaitingScreen() {
 //There are multiple public Overpass instances available. See https://wiki.openstreetmap.org/wiki/Overpass_API#Public_Overpass_API_instances
 //Array of Overpass servers to try in order. If the first server fails, the fallback servers will be tried.
 const overpassServers = [
-    '//maps.mail.ru/osm/tools/overpass/api/', // Primary server (VK Maps)
-    '//overpass-api.de/api/' // Fallback server 1
+    '//overpass-api.de/api/', // Primary server (overpass-api.de).
+    '//maps.mail.ru/osm/tools/overpass/api/' // Fallback server (VK Maps)
     //'//overpass.private.coffee/api/' // Fallback server 2. Does not work at all. Only returns empty document after 1.1min. Thus commented out.
 ];
 const vandalismThreshold = -3; //If 3 more elements or tags have been deleted than added, the traffic light will change to red
@@ -355,7 +360,14 @@ function run() {
         const tryServer = (index) => {
             const server = servers[index];
             const url = server + 'interpreter?data=' + query;
-            console.log(`Trying Overpass server ${index + 1}/${servers.length}: ${server}`);
+            const tryingMessage = `Trying Overpass server ${index + 1}/${servers.length}: ${server}`;
+            console.log(tryingMessage);
+
+            // Show the same message below the loading spinner while it is visible
+            const loadingAnimationText = document.querySelector("#loading-animation-text");
+            if (!loadingAnimationText.classList.contains("hide")) {
+                loadingAnimationText.innerText = tryingMessage;
+            }
 
             return fetch(url, { signal: signal })
                 .then(response => {
